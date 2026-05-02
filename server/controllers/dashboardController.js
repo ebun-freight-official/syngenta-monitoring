@@ -1,0 +1,1558 @@
+const Truck = require("../models/truckModel");
+const Driver = require("../models/driverModel");
+const Deployment = require("../models/deploymentModel");
+const User = require("../models/userModel");
+
+const getDashboardAnalytics = async (req, res) => {
+  try {
+    const now = new Date();
+    const last30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const last12Weeks = new Date(now.getTime() - 12 * 7 * 24 * 60 * 60 * 1000);
+
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const currentYearStart = new Date(now.getFullYear(), 0, 1);
+
+    const baseFilter = { isSoftDeleted: { $ne: true } };
+    const truckAndDriverFilter = { isSoftDeleted: { $ne: true } };
+
+    if (req.user.role === "subcon" && req.user.subcon) {
+      truckAndDriverFilter.subcon = req.user.subcon;
+    }
+
+    let subconTruckIds = null;
+    if (req.user.role === "subcon" && req.user.subcon) {
+      const subconTrucks = await Truck.find({ subcon: req.user.subcon })
+        .select("_id")
+        .lean();
+      subconTruckIds = subconTrucks.map((t) => t._id);
+    }
+
+    const deploymentFilter = subconTruckIds
+      ? { ...baseFilter, truckId: { $in: subconTruckIds } }
+      : { ...baseFilter };
+
+    const promises = {
+      // ── Deployment counts ─────────────────────────────────────────────
+      // FIX: moved totalDeployments into promises to avoid a separate post-Promise.all query
+      totalDeployments: Deployment.countDocuments(deploymentFilter),
+
+      preparingDeployments: Deployment.countDocuments({
+        ...deploymentFilter,
+        status: "preparing",
+      }),
+      ongoingDeployments: Deployment.countDocuments({
+        ...deploymentFilter,
+        status: "ongoing",
+      }),
+      completedDeployments: Deployment.countDocuments({
+        ...deploymentFilter,
+        status: "completed",
+      }),
+      cancelledDeployments: Deployment.countDocuments({
+        ...deploymentFilter,
+        status: "canceled",
+      }),
+      recentDeployments: Deployment.countDocuments({
+        ...deploymentFilter,
+        createdAt: { $gte: last7Days },
+      }),
+      deploymentsLast30Days: Deployment.countDocuments({
+        ...deploymentFilter,
+        createdAt: { $gte: last30Days },
+      }),
+      monthlyDeployments: Deployment.countDocuments({
+        ...deploymentFilter,
+        createdAt: { $gte: currentMonthStart },
+      }),
+      yearlyDeployments: Deployment.countDocuments({
+        ...deploymentFilter,
+        createdAt: { $gte: currentYearStart },
+      }),
+      recentActivity: Deployment.countDocuments({
+        ...deploymentFilter,
+        createdAt: { $gte: new Date(now.getTime() - 24 * 60 * 60 * 1000) },
+      }),
+
+      // ── Truck / Driver counts ─────────────────────────────────────────
+      totalTrucks: Truck.countDocuments(truckAndDriverFilter),
+      totalDrivers: Driver.countDocuments(truckAndDriverFilter),
+      availableTrucks: Truck.countDocuments({
+        ...truckAndDriverFilter,
+        status: "available",
+      }),
+      availableDrivers: Driver.countDocuments({
+        ...truckAndDriverFilter,
+        status: "available",
+      }),
+      trucksInMaintenance: Truck.countDocuments({
+        ...truckAndDriverFilter,
+        status: "unavailable",
+      }),
+      inactiveDrivers: Driver.countDocuments({
+        ...truckAndDriverFilter,
+        status: "unavailable",
+      }),
+      activeTrucks: Truck.countDocuments({
+        ...truckAndDriverFilter,
+        status: { $in: ["available", "deployed"] },
+      }),
+      deployedTrucks: Truck.countDocuments({
+        ...truckAndDriverFilter,
+        status: "deployed",
+      }),
+      deployedDrivers: Driver.countDocuments({
+        ...truckAndDriverFilter,
+        status: "deployed",
+      }),
+
+      // ── User counts ───────────────────────────────────────────────────
+      totalUsers: User.countDocuments({ isSoftDeleted: { $ne: true } }),
+      activeUsers: User.countDocuments({
+        isSoftDeleted: { $ne: true },
+        status: "active",
+      }),
+      pendingUsers: User.countDocuments({
+        isSoftDeleted: { $ne: true },
+        status: "pending",
+      }),
+      recentRegistrations: User.countDocuments({
+        isSoftDeleted: { $ne: true },
+        createdAt: { $gte: last30Days },
+      }),
+
+      // ── Aggregations ──────────────────────────────────────────────────
+      truckStatusAnalytics: Truck.aggregate([
+        { $match: truckAndDriverFilter },
+        { $group: { _id: "$status", count: { $sum: 1 } } },
+      ]),
+      truckTypeAnalytics: Truck.aggregate([
+        { $match: truckAndDriverFilter },
+        { $group: { _id: "$truckType", count: { $sum: 1 } } },
+      ]),
+      driverStatusAnalytics: Driver.aggregate([
+        { $match: truckAndDriverFilter },
+        { $group: { _id: "$status", count: { $sum: 1 } } },
+      ]),
+      topDriversByTrips: Driver.aggregate([
+        { $match: truckAndDriverFilter },
+        { $sort: { tripCount: -1 } },
+        { $limit: 20 },
+        {
+          $project: {
+            name: { $concat: ["$firstname", " ", "$lastname"] },
+            tripCount: 1,
+            status: 1,
+            imageUrl: 1,
+            phoneNo: 1,
+            subcon: 1,
+            licenseNo: 1,
+          },
+        },
+      ]),
+
+      deploymentStatusAnalytics: Deployment.aggregate([
+        {
+          $match: {
+            ...deploymentFilter,
+            status: {
+              $in: ["completed", "ongoing", "canceled", "preparing"],
+            },
+          },
+        },
+        { $group: { _id: "$status", count: { $sum: 1 } } },
+      ]),
+
+      // FIX: removed weeklyDeploymentAnalytics — it was never consumed by the frontend
+      // and duplicated data already present in weeklyDeploymentStatusAnalytics
+
+      // Weekly trends (last 12 weeks) — grouped by departed (when truck left the station)
+      weeklyDeploymentStatusAnalytics: Deployment.aggregate([
+        {
+          $match: {
+            ...deploymentFilter,
+            status: { $ne: "canceled" },
+            departed: { $ne: "", $exists: true },
+          },
+        },
+        {
+          $addFields: {
+            departedDate: {
+              $dateFromString: {
+                dateString: "$departed",
+                onError: null,
+                onNull: null,
+              },
+            },
+          },
+        },
+        { $match: { departedDate: { $gte: last12Weeks } } },
+        {
+          $group: {
+            _id: {
+              year: { $year: "$departedDate" },
+              month: { $month: "$departedDate" },
+              week: {
+                $ceil: { $divide: [{ $dayOfMonth: "$departedDate" }, 7] },
+              },
+              status: "$status",
+            },
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { "_id.year": 1, "_id.month": 1, "_id.week": 1 } },
+      ]),
+
+      // Daily trends (last 30 days) — grouped by departed
+      dailyDeploymentStatusAnalytics: Deployment.aggregate([
+        {
+          $match: {
+            ...deploymentFilter,
+            status: { $ne: "canceled" },
+            departed: { $ne: "", $exists: true },
+          },
+        },
+        {
+          $addFields: {
+            departedDate: {
+              $dateFromString: {
+                dateString: "$departed",
+                onError: null,
+                onNull: null,
+              },
+            },
+          },
+        },
+        { $match: { departedDate: { $gte: last30Days } } },
+        {
+          $group: {
+            _id: {
+              year: { $year: "$departedDate" },
+              month: { $month: "$departedDate" },
+              day: { $dayOfMonth: "$departedDate" },
+              status: "$status",
+            },
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { "_id.year": 1, "_id.month": 1, "_id.day": 1 } },
+      ]),
+
+      weeklySacksAnalytics: Deployment.aggregate([
+        {
+          $match: {
+            ...deploymentFilter,
+            status: { $ne: "canceled" },
+            createdAt: { $gte: last12Weeks },
+          },
+        },
+        {
+          $group: {
+            _id: {
+              year: { $year: "$createdAt" },
+              month: { $month: "$createdAt" },
+              week: { $ceil: { $divide: [{ $dayOfMonth: "$createdAt" }, 7] } },
+            },
+            totalSacks: { $sum: "$totalSacksCount" },
+            deploymentCount: { $sum: 1 },
+            avgSacksPerDeployment: { $avg: "$totalSacksCount" },
+          },
+        },
+        { $sort: { "_id.year": 1, "_id.month": 1, "_id.week": 1 } },
+      ]),
+
+      weeklyWeightAnalytics: Deployment.aggregate([
+        {
+          $match: {
+            ...deploymentFilter,
+            status: { $ne: "canceled" },
+            createdAt: { $gte: last12Weeks },
+          },
+        },
+        {
+          $group: {
+            _id: {
+              year: { $year: "$createdAt" },
+              month: { $month: "$createdAt" },
+              week: { $ceil: { $divide: [{ $dayOfMonth: "$createdAt" }, 7] } },
+            },
+            totalWeight: { $sum: "$totalWeightKg" },
+            deploymentCount: { $sum: 1 },
+            avgWeightPerDeployment: { $avg: "$totalWeightKg" },
+          },
+        },
+        { $sort: { "_id.year": 1, "_id.month": 1, "_id.week": 1 } },
+      ]),
+
+      // ── Weight breakdown (est / field / plant) per week ───────────────
+      // ── Weight breakdown (est / field / plant) per week ───────────────
+      // Uses departed (ISO string) — the date the truck left the station,
+      // which is more accurate than createdAt for grouping actual weight data.
+      weeklyWeightBreakdown: Deployment.aggregate([
+        {
+          $match: {
+            ...deploymentFilter,
+            status: "completed",
+            departed: { $ne: "", $exists: true },
+          },
+        },
+        {
+          $addFields: {
+            departedDate: {
+              $dateFromString: {
+                dateString: "$departed",
+                onError: null,
+                onNull: null,
+              },
+            },
+          },
+        },
+        {
+          $match: {
+            departedDate: { $gte: last12Weeks },
+          },
+        },
+        { $unwind: "$pickups" },
+        {
+          $group: {
+            _id: {
+              year: { $year: "$departedDate" },
+              month: { $month: "$departedDate" },
+              week: {
+                $ceil: { $divide: [{ $dayOfMonth: "$departedDate" }, 7] },
+              },
+            },
+            totalEstWeight: {
+              $sum: {
+                $convert: {
+                  input: "$pickups.estimatedWeightKg",
+                  to: "double",
+                  onError: 0,
+                  onNull: 0,
+                },
+              },
+            },
+            totalFieldWeight: {
+              $sum: {
+                $convert: {
+                  input: "$pickups.fieldWeightKg",
+                  to: "double",
+                  onError: 0,
+                  onNull: 0,
+                },
+              },
+            },
+            totalPlantWeight: {
+              $sum: {
+                $convert: {
+                  input: "$pickups.plantWeightKg",
+                  to: "double",
+                  onError: 0,
+                  onNull: 0,
+                },
+              },
+            },
+          },
+        },
+        { $sort: { "_id.year": 1, "_id.month": 1, "_id.week": 1 } },
+      ]),
+
+      // ── Weight breakdown (est / field / plant) per day ────────────────
+      dailyWeightBreakdown: Deployment.aggregate([
+        {
+          $match: {
+            ...deploymentFilter,
+            status: "completed",
+            departed: { $ne: "", $exists: true },
+          },
+        },
+        {
+          $addFields: {
+            departedDate: {
+              $dateFromString: {
+                dateString: "$departed",
+                onError: null,
+                onNull: null,
+              },
+            },
+          },
+        },
+        {
+          $match: {
+            departedDate: { $gte: last30Days },
+          },
+        },
+        { $unwind: "$pickups" },
+        {
+          $group: {
+            _id: {
+              year: { $year: "$departedDate" },
+              month: { $month: "$departedDate" },
+              day: { $dayOfMonth: "$departedDate" },
+            },
+            totalEstWeight: {
+              $sum: {
+                $convert: {
+                  input: "$pickups.estimatedWeightKg",
+                  to: "double",
+                  onError: 0,
+                  onNull: 0,
+                },
+              },
+            },
+            totalFieldWeight: {
+              $sum: {
+                $convert: {
+                  input: "$pickups.fieldWeightKg",
+                  to: "double",
+                  onError: 0,
+                  onNull: 0,
+                },
+              },
+            },
+            totalPlantWeight: {
+              $sum: {
+                $convert: {
+                  input: "$pickups.plantWeightKg",
+                  to: "double",
+                  onError: 0,
+                  onNull: 0,
+                },
+              },
+            },
+          },
+        },
+        { $sort: { "_id.year": 1, "_id.month": 1, "_id.day": 1 } },
+      ]),
+
+      topPickupSites: Deployment.aggregate([
+        { $match: deploymentFilter },
+        { $unwind: "$pickups" },
+        {
+          $match: {
+            "pickups.pickupSite": { $exists: true, $ne: "" },
+          },
+        },
+        {
+          $group: {
+            _id: "$pickups.pickupSite",
+            count: { $sum: 1 },
+            totalSacks: { $sum: "$pickups.sacksCount" },
+            totalWeight: {
+              $sum: {
+                $ifNull: [
+                  {
+                    $convert: {
+                      input: "$pickups.plantWeightKg",
+                      to: "double",
+                      onError: null,
+                      onNull: null,
+                    },
+                  },
+                  {
+                    $convert: {
+                      input: "$pickups.actualWeightKg",
+                      to: "double",
+                      onError: 0,
+                      onNull: 0,
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        },
+        { $sort: { count: -1 } },
+        { $limit: 10 },
+      ]),
+
+      deploymentEfficiency: Deployment.aggregate([
+        { $match: { ...deploymentFilter, status: { $ne: "canceled" } } },
+        {
+          $group: {
+            _id: null,
+            avgSacks: { $avg: "$totalSacksCount" },
+            avgWeight: { $avg: "$totalWeightKg" },
+            maxSacks: { $max: "$totalSacksCount" },
+            maxWeight: { $max: "$totalWeightKg" },
+          },
+        },
+      ]),
+
+      completedCargoMetrics: Deployment.aggregate([
+        { $match: { ...deploymentFilter, status: "completed" } },
+        {
+          $group: {
+            _id: null,
+            totalCompletedSacks: { $sum: "$totalSacksCount" },
+            totalCompletedWeight: { $sum: "$totalWeightKg" },
+            avgCompletedSacks: { $avg: "$totalSacksCount" },
+            avgCompletedWeight: { $avg: "$totalWeightKg" },
+            maxCompletedSacks: { $max: "$totalSacksCount" },
+            maxCompletedWeight: { $max: "$totalWeightKg" },
+          },
+        },
+      ]),
+
+      // FIX: moved totalSacks aggregate into promises to avoid a separate post-Promise.all query
+      totalSacksAggregate: Deployment.aggregate([
+        { $match: { ...deploymentFilter, status: { $ne: "canceled" } } },
+        {
+          $group: {
+            _id: null,
+            totalSacks: { $sum: "$totalSacksCount" },
+            totalWeight: { $sum: "$totalWeightKg" },
+          },
+        },
+      ]),
+
+      userRoleAnalytics: User.aggregate([
+        { $match: { isSoftDeleted: { $ne: true } } },
+        { $group: { _id: "$role", count: { $sum: 1 } } },
+      ]),
+      userStatusAnalytics: User.aggregate([
+        { $match: { isSoftDeleted: { $ne: true } } },
+        { $group: { _id: "$status", count: { $sum: 1 } } },
+      ]),
+      subconAnalytics: User.aggregate([
+        {
+          $match: {
+            isSoftDeleted: { $ne: true },
+            subcon: { $exists: true, $ne: "" },
+          },
+        },
+        { $group: { _id: "$subcon", count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 10 },
+      ]),
+      userLoginAnalytics: User.aggregate([
+        { $match: { isSoftDeleted: { $ne: true } } },
+        {
+          $group: {
+            _id: null,
+            totalLogins: { $sum: "$loginCount" },
+            avgLoginCount: { $avg: "$loginCount" },
+            maxLoginCount: { $max: "$loginCount" },
+          },
+        },
+      ]),
+
+      subconPerformance: Deployment.aggregate([
+        { $match: deploymentFilter },
+        {
+          $lookup: {
+            from: "trucks",
+            localField: "truckId",
+            foreignField: "_id",
+            as: "truck",
+          },
+        },
+        { $unwind: "$truck" },
+        {
+          $lookup: {
+            from: "trucks",
+            localField: "replacement.replacementTruckId",
+            foreignField: "_id",
+            as: "replacementTruck",
+          },
+        },
+        {
+          $addFields: {
+            // FIX: guard against replacementTruck existing but having null subcon
+            activeSubcon: {
+              $cond: [
+                {
+                  $and: [
+                    { $gt: [{ $size: "$replacementTruck" }, 0] },
+                    {
+                      $ne: [
+                        { $arrayElemAt: ["$replacementTruck.subcon", 0] },
+                        null,
+                      ],
+                    },
+                  ],
+                },
+                { $arrayElemAt: ["$replacementTruck.subcon", 0] },
+                "$truck.subcon",
+              ],
+            },
+          },
+        },
+        {
+          $group: {
+            _id: { subcon: "$activeSubcon", status: "$status" },
+            count: { $sum: 1 },
+            totalSacks: { $sum: "$totalSacksCount" },
+            totalWeight: { $sum: "$totalWeightKg" },
+          },
+        },
+        { $sort: { "_id.subcon": 1 } },
+      ]),
+
+      subconDriverPerformance: Driver.aggregate([
+        { $match: truckAndDriverFilter },
+        { $sort: { tripCount: -1 } },
+        {
+          $project: {
+            name: { $concat: ["$firstname", " ", "$lastname"] },
+            tripCount: 1,
+            status: 1,
+            phoneNo: 1,
+            licenseNo: 1,
+            subcon: 1,
+          },
+        },
+      ]),
+
+      subconTruckPerformance: Truck.aggregate([
+        { $match: truckAndDriverFilter },
+        { $sort: { tripCount: -1 } },
+        {
+          $project: {
+            plateNo: 1,
+            truckType: 1,
+            tripCount: 1,
+            status: 1,
+            maxLoad: 1,
+            subcon: 1,
+          },
+        },
+      ]),
+
+      subconDriverStatusAnalytics: Driver.aggregate([
+        { $match: truckAndDriverFilter },
+        { $group: { _id: "$status", count: { $sum: 1 } } },
+      ]),
+      subconTruckStatusAnalytics: Truck.aggregate([
+        { $match: truckAndDriverFilter },
+        { $group: { _id: "$status", count: { $sum: 1 } } },
+      ]),
+      subconTruckTypeAnalytics: Truck.aggregate([
+        { $match: truckAndDriverFilter },
+        { $group: { _id: "$truckType", count: { $sum: 1 } } },
+      ]),
+
+      territoryAnalytics: Deployment.aggregate([
+        { $match: deploymentFilter },
+        { $group: { _id: "$territory", count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+      ]),
+      hybridAnalytics: Deployment.aggregate([
+        { $match: deploymentFilter },
+        { $group: { _id: "$hybrid", count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+      ]),
+      flaggingAnalytics: Deployment.aggregate([
+        { $match: deploymentFilter },
+        { $group: { _id: "$flagging", count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+      ]),
+
+      territoryPerformance: Deployment.aggregate([
+        { $match: deploymentFilter },
+        {
+          $group: {
+            _id: "$territory",
+            count: { $sum: 1 },
+            totalSacks: { $sum: "$totalSacksCount" },
+            totalWeight: { $sum: "$totalWeightKg" },
+            avgSacks: { $avg: "$totalSacksCount" },
+            avgWeight: { $avg: "$totalWeightKg" },
+            completed: {
+              $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] },
+            },
+            completedSacks: {
+              $sum: {
+                $cond: [
+                  { $eq: ["$status", "completed"] },
+                  "$totalSacksCount",
+                  0,
+                ],
+              },
+            },
+            completedWeight: {
+              $sum: {
+                $cond: [{ $eq: ["$status", "completed"] }, "$totalWeightKg", 0],
+              },
+            },
+          },
+        },
+        {
+          $project: {
+            _id: 1,
+            count: 1,
+            totalSacks: 1,
+            totalWeight: 1,
+            avgSacks: 1,
+            avgWeight: 1,
+            completed: 1,
+            completedSacks: 1,
+            completedWeight: 1,
+            completionRate: {
+              $cond: [
+                { $eq: ["$count", 0] },
+                0,
+                { $multiply: [{ $divide: ["$completed", "$count"] }, 100] },
+              ],
+            },
+          },
+        },
+        { $sort: { count: -1 } },
+        { $limit: 15 },
+      ]),
+
+      hybridPerformance: Deployment.aggregate([
+        { $match: { ...deploymentFilter, status: { $ne: "canceled" } } },
+        {
+          $group: {
+            _id: "$hybrid",
+            count: { $sum: 1 },
+            totalSacks: { $sum: "$totalSacksCount" },
+            totalWeight: { $sum: "$totalWeightKg" },
+            avgSacks: { $avg: "$totalSacksCount" },
+            avgWeight: { $avg: "$totalWeightKg" },
+          },
+        },
+        { $sort: { count: -1 } },
+      ]),
+
+      flaggingPerformance: Deployment.aggregate([
+        { $match: { ...deploymentFilter, status: { $ne: "canceled" } } },
+        {
+          $group: {
+            _id: "$flagging",
+            count: { $sum: 1 },
+            totalSacks: { $sum: "$totalSacksCount" },
+            totalWeight: { $sum: "$totalWeightKg" },
+            avgSacks: { $avg: "$totalSacksCount" },
+            avgWeight: { $avg: "$totalWeightKg" },
+          },
+        },
+        { $sort: { count: -1 } },
+      ]),
+
+      territoryStatusAnalytics: Deployment.aggregate([
+        { $match: deploymentFilter },
+        {
+          $group: {
+            _id: { territory: "$territory", status: "$status" },
+            count: { $sum: 1 },
+            totalSacks: { $sum: "$totalSacksCount" },
+            totalWeight: { $sum: "$totalWeightKg" },
+          },
+        },
+        { $sort: { "_id.territory": 1 } },
+      ]),
+      hybridStatusAnalytics: Deployment.aggregate([
+        { $match: deploymentFilter },
+        {
+          $group: {
+            _id: { hybrid: "$hybrid", status: "$status" },
+            count: { $sum: 1 },
+            totalSacks: { $sum: "$totalSacksCount" },
+            totalWeight: { $sum: "$totalWeightKg" },
+          },
+        },
+        { $sort: { "_id.hybrid": 1 } },
+      ]),
+      flaggingStatusAnalytics: Deployment.aggregate([
+        { $match: deploymentFilter },
+        {
+          $group: {
+            _id: { flagging: "$flagging", status: "$status" },
+            count: { $sum: 1 },
+            totalSacks: { $sum: "$totalSacksCount" },
+            totalWeight: { $sum: "$totalWeightKg" },
+          },
+        },
+        { $sort: { "_id.flagging": 1 } },
+      ]),
+
+      monthlyTerritoryAnalytics: Deployment.aggregate([
+        {
+          $match: {
+            ...deploymentFilter,
+            status: { $ne: "canceled" },
+            createdAt: {
+              $gte: new Date(now.getFullYear() - 1, now.getMonth(), 1),
+            },
+          },
+        },
+        {
+          $group: {
+            _id: {
+              year: { $year: "$createdAt" },
+              month: { $month: "$createdAt" },
+              territory: "$territory",
+            },
+            count: { $sum: 1 },
+            totalSacks: { $sum: "$totalSacksCount" },
+            totalWeight: { $sum: "$totalWeightKg" },
+          },
+        },
+        { $sort: { "_id.year": 1, "_id.month": 1, "_id.territory": 1 } },
+      ]),
+
+      weeklyTerritoryAnalytics: Deployment.aggregate([
+        {
+          $match: {
+            ...deploymentFilter,
+            status: { $ne: "canceled" },
+            createdAt: { $gte: last12Weeks },
+          },
+        },
+        {
+          $group: {
+            _id: {
+              year: { $year: "$createdAt" },
+              month: { $month: "$createdAt" },
+              week: { $ceil: { $divide: [{ $dayOfMonth: "$createdAt" }, 7] } },
+              territory: "$territory",
+            },
+            count: { $sum: 1 },
+            totalSacks: { $sum: "$totalSacksCount" },
+            totalWeight: { $sum: "$totalWeightKg" },
+          },
+        },
+        { $sort: { "_id.year": 1, "_id.month": 1, "_id.week": 1 } },
+      ]),
+    };
+
+    const results = await Promise.all(Object.values(promises));
+    const data = Object.keys(promises).reduce((acc, key, index) => {
+      acc[key] = results[index];
+      return acc;
+    }, {});
+
+    // ── Process subcon performance ────────────────────────────────────────
+    const processedSubconPerformance = {};
+    data.subconPerformance.forEach((item) => {
+      const subcon = item._id.subcon;
+      const status = item._id.status;
+      if (!subcon) return;
+
+      if (!processedSubconPerformance[subcon]) {
+        processedSubconPerformance[subcon] = {
+          name: subcon,
+          totalDeployments: 0,
+          totalSacks: 0,
+          totalWeight: 0,
+          statusBreakdown: {
+            preparing: 0,
+            ongoing: 0,
+            completed: 0,
+            canceled: 0,
+          },
+        };
+      }
+
+      processedSubconPerformance[subcon].totalDeployments += item.count;
+      processedSubconPerformance[subcon].totalSacks += item.totalSacks || 0;
+      processedSubconPerformance[subcon].totalWeight += item.totalWeight || 0;
+
+      if (
+        status &&
+        processedSubconPerformance[subcon].statusBreakdown[status] !== undefined
+      ) {
+        processedSubconPerformance[subcon].statusBreakdown[status] = item.count;
+      }
+    });
+
+    // ── Process territory / hybrid / flagging performance ─────────────────
+    const buildPerformanceMap = (statusAnalytics, idField) => {
+      const map = {};
+      statusAnalytics.forEach((item) => {
+        const key = item._id[idField];
+        const status = item._id.status;
+
+        if (!map[key]) {
+          map[key] = {
+            name: key,
+            totalDeployments: 0,
+            totalSacks: 0,
+            totalWeight: 0,
+            statusBreakdown: {
+              preparing: 0,
+              ongoing: 0,
+              completed: 0,
+              canceled: 0,
+            },
+          };
+        }
+
+        map[key].totalDeployments += item.count;
+        map[key].totalSacks += item.totalSacks || 0;
+        map[key].totalWeight += item.totalWeight || 0;
+
+        if (status && map[key].statusBreakdown[status] !== undefined) {
+          map[key].statusBreakdown[status] = item.count;
+        }
+      });
+      return map;
+    };
+
+    const processedTerritoryPerformance = buildPerformanceMap(
+      data.territoryStatusAnalytics,
+      "territory",
+    );
+    const processedHybridPerformance = buildPerformanceMap(
+      data.hybridStatusAnalytics,
+      "hybrid",
+    );
+    const processedFlaggingPerformance = buildPerformanceMap(
+      data.flaggingStatusAnalytics,
+      "flagging",
+    );
+
+    const formatPerformanceList = (map) =>
+      Object.values(map)
+        .map((item) => ({
+          ...item,
+          completedDeployments: item.statusBreakdown.completed || 0,
+          completionRate:
+            item.totalDeployments > 0
+              ? (
+                  ((item.statusBreakdown.completed || 0) /
+                    item.totalDeployments) *
+                  100
+                ).toFixed(1)
+              : "0",
+        }))
+        .sort((a, b) => b.totalDeployments - a.totalDeployments)
+        .slice(0, 10);
+
+    const formattedSubconPerformance = formatPerformanceList(
+      processedSubconPerformance,
+    );
+    const formattedTerritoryPerformance = formatPerformanceList(
+      processedTerritoryPerformance,
+    );
+    const formattedHybridPerformance = formatPerformanceList(
+      processedHybridPerformance,
+    );
+    const formattedFlaggingPerformance = formatPerformanceList(
+      processedFlaggingPerformance,
+    );
+
+    // ── Derived metrics ───────────────────────────────────────────────────
+    // FIX: totalDeployments now comes from data instead of a second DB query
+    const totalDeployments = data.totalDeployments;
+
+    const completionRate =
+      totalDeployments > 0
+        ? ((data.completedDeployments / totalDeployments) * 100).toFixed(1)
+        : 0;
+    const cancellationRate =
+      totalDeployments > 0
+        ? ((data.cancelledDeployments / totalDeployments) * 100).toFixed(1)
+        : 0;
+    const finalizedDeployments =
+      data.completedDeployments + data.cancelledDeployments;
+    const successRate =
+      finalizedDeployments > 0
+        ? ((data.completedDeployments / finalizedDeployments) * 100).toFixed(1)
+        : 0;
+
+    // FIX: totalSacks now comes from the promises batch
+    const totalSacks = data.totalSacksAggregate[0]?.totalSacks || 0;
+    const totalWeight = data.totalSacksAggregate[0]?.totalWeight || 0;
+
+    const efficiencyData = data.deploymentEfficiency[0] || {};
+    const avgSacks = efficiencyData.avgSacks || 0;
+    const avgWeight = efficiencyData.avgWeight || 0;
+    const maxSacks = efficiencyData.maxSacks || 0;
+    const maxWeight = efficiencyData.maxWeight || 0;
+
+    const completedCargoData = data.completedCargoMetrics[0] || {};
+    const totalCompletedSacks = completedCargoData.totalCompletedSacks || 0;
+    const totalCompletedWeight = completedCargoData.totalCompletedWeight || 0;
+    const avgCompletedSacks = completedCargoData.avgCompletedSacks || 0;
+    const avgCompletedWeight = completedCargoData.avgCompletedWeight || 0;
+    const maxCompletedSacks = completedCargoData.maxCompletedSacks || 0;
+    const maxCompletedWeight = completedCargoData.maxCompletedWeight || 0;
+
+    const utilizationRate =
+      data.totalTrucks > 0
+        ? ((data.deployedTrucks / data.totalTrucks) * 100).toFixed(1)
+        : 0;
+    const driverUtilizationRate =
+      data.totalDrivers > 0
+        ? ((data.deployedDrivers / data.totalDrivers) * 100).toFixed(1)
+        : 0;
+
+    const userLoginData = data.userLoginAnalytics[0] || {};
+    const totalLogins = userLoginData.totalLogins || 0;
+    const avgLoginCount = userLoginData.avgLoginCount || 0;
+    const maxLoginCount = userLoginData.maxLoginCount || 0;
+
+    // totalOngoingDeployments: preparing + ongoing
+    const totalOngoingDeployments =
+      (data.preparingDeployments || 0) + (data.ongoingDeployments || 0);
+
+    const formatArrayData = (array, fallback = []) =>
+      Array.isArray(array) && array.length > 0 ? array : fallback;
+
+    const weeklyTrendsData = formatArrayData(
+      data.weeklyDeploymentStatusAnalytics,
+    );
+    const dailyTrendsData = formatArrayData(
+      data.dailyDeploymentStatusAnalytics,
+    );
+    const weeklySacksData = formatArrayData(data.weeklySacksAnalytics);
+    const weeklyWeightData = formatArrayData(data.weeklyWeightAnalytics);
+
+    const deploymentStatusData = formatArrayData(
+      data.deploymentStatusAnalytics,
+    );
+    const deploymentStatusMap = {
+      completed: "Completed",
+      ongoing: "Ongoing",
+      canceled: "Cancelled",
+      preparing: "Preparing",
+    };
+
+    const userRoleData = formatArrayData(data.userRoleAnalytics);
+    const userStatusData = formatArrayData(data.userStatusAnalytics);
+    const subconData = formatArrayData(data.subconAnalytics);
+
+    const formatWeekLabel = (year, month, week) => {
+      const monthNames = [
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec",
+      ];
+      const startDay = (week - 1) * 7 + 1;
+      const endDay = Math.min(startDay + 6, new Date(year, month, 0).getDate());
+      return `${monthNames[month - 1]} ${startDay}-${endDay}`;
+    };
+
+    const formatDayLabel = (year, month, day) => {
+      const monthNames = [
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec",
+      ];
+      return `${monthNames[month - 1]} ${day}`;
+    };
+
+    const processWeeklyDeploymentData = (weeklyData) => {
+      if (!weeklyData || weeklyData.length === 0) return [];
+      const weeklyMap = {};
+      weeklyData.forEach((item) => {
+        const { year, month, week, status } = item._id;
+        const count = item.count || 0;
+        const weekKey = `${year}-${month}-${week}`;
+        if (!weeklyMap[weekKey]) {
+          weeklyMap[weekKey] = { year, month, week, completed: 0 };
+        }
+        if (status === "completed") weeklyMap[weekKey].completed = count;
+      });
+      // FIX: removed .filter(week => week.completed > 0)
+      // Keeping weeks with 0 completions avoids misleading gaps in the trend line.
+      return Object.values(weeklyMap)
+        .sort((a, b) => {
+          if (a.year !== b.year) return a.year - b.year;
+          if (a.month !== b.month) return a.month - b.month;
+          return a.week - b.week;
+        })
+        .map((week) => ({
+          ...week,
+          label: formatWeekLabel(week.year, week.month, week.week),
+        }));
+    };
+
+    const processDailyDeploymentData = (dailyData) => {
+      if (!dailyData || dailyData.length === 0) return [];
+      const dailyMap = {};
+      dailyData.forEach((item) => {
+        const { year, month, day, status } = item._id;
+        const count = item.count || 0;
+        const dayKey = `${year}-${month}-${day}`;
+        if (!dailyMap[dayKey]) {
+          dailyMap[dayKey] = { year, month, day, completed: 0 };
+        }
+        if (status === "completed") dailyMap[dayKey].completed = count;
+      });
+      return Object.values(dailyMap)
+        .sort((a, b) => {
+          if (a.year !== b.year) return a.year - b.year;
+          if (a.month !== b.month) return a.month - b.month;
+          return a.day - b.day;
+        })
+        .map((day) => ({
+          ...day,
+          label: formatDayLabel(day.year, day.month, day.day),
+        }));
+    };
+
+    const processWeeklySacksData = (weeklyData) => {
+      if (!weeklyData || weeklyData.length === 0) return [];
+      return weeklyData
+        .filter((item) => item.totalSacks > 0 || item.deploymentCount > 0)
+        .sort((a, b) => {
+          if (a._id.year !== b._id.year) return a._id.year - b._id.year;
+          if (a._id.month !== b._id.month) return a._id.month - b._id.month;
+          return a._id.week - b._id.week;
+        })
+        .map((item) => ({
+          ...item,
+          label: formatWeekLabel(item._id.year, item._id.month, item._id.week),
+        }));
+    };
+
+    const processWeeklyWeightData = (weeklyData) => {
+      if (!weeklyData || weeklyData.length === 0) return [];
+      return weeklyData
+        .filter((item) => item.totalWeight > 0 || item.deploymentCount > 0)
+        .sort((a, b) => {
+          if (a._id.year !== b._id.year) return a._id.year - b._id.year;
+          if (a._id.month !== b._id.month) return a._id.month - b._id.month;
+          return a._id.week - b._id.week;
+        })
+        .map((item) => ({
+          ...item,
+          label: formatWeekLabel(item._id.year, item._id.month, item._id.week),
+        }));
+    };
+
+    const processedWeeklyDeployments =
+      processWeeklyDeploymentData(weeklyTrendsData);
+    const processedDailyDeployments =
+      processDailyDeploymentData(dailyTrendsData);
+    const processedWeeklySacks = processWeeklySacksData(weeklySacksData);
+    const processedWeeklyWeight = processWeeklyWeightData(weeklyWeightData);
+
+    const formattedPickupSites = formatArrayData(data.topPickupSites).map(
+      (site) => ({
+        name: site._id,
+        count: site.count,
+        totalSacks: site.totalSacks,
+        totalWeight: site.totalWeight,
+      }),
+    );
+
+    const formattedTerritoryMetrics = formatArrayData(data.territoryPerformance)
+      .map((item) => ({
+        _id: item._id || "Unknown",
+        count: item.count || 0,
+        completed: item.completed || 0,
+        completionRate: parseFloat((item.completionRate || 0).toFixed(1)),
+        totalSacks: item.totalSacks || 0,
+        totalWeight: item.totalWeight || 0,
+        completedSacks: item.completedSacks || 0,
+        completedWeight: item.completedWeight || 0,
+        avgSacks: parseFloat((item.avgSacks || 0).toFixed(1)),
+        avgWeight: parseFloat((item.avgWeight || 0).toFixed(1)),
+      }))
+      .filter((item) => item._id !== "Unknown" && item._id !== null);
+
+    const analyticsData = {
+      overview: {
+        totalTrucks: data.totalTrucks || 0,
+        totalDrivers: data.totalDrivers || 0,
+        totalUsers: data.totalUsers || 0,
+        // FIX: activeDeployments here now reflects the corrected totalOngoingDeployments
+        activeDeployments: totalOngoingDeployments || 0,
+        availableTrucks: data.availableTrucks || 0,
+        availableDrivers: data.availableDrivers || 0,
+        deployedTrucks: data.deployedTrucks || 0,
+        deployedDrivers: data.deployedDrivers || 0,
+        trucksInMaintenance: data.trucksInMaintenance || 0,
+        inactiveDrivers: data.inactiveDrivers || 0,
+        completedDeployments: data.completedDeployments || 0,
+        cancelledDeployments: data.cancelledDeployments || 0,
+        preparingDeployments: data.preparingDeployments || 0,
+        recentDeployments: data.recentDeployments || 0,
+        monthlyDeployments: data.monthlyDeployments || 0,
+        yearlyDeployments: data.yearlyDeployments || 0,
+        deploymentsLast30Days: data.deploymentsLast30Days || 0,
+        recentActivity: data.recentActivity || 0,
+        totalSacks: totalSacks || 0,
+        totalWeight: totalWeight || 0,
+        avgSacksPerDeployment: parseFloat(avgSacks.toFixed(1)),
+        avgWeightPerDeployment: parseFloat(avgWeight.toFixed(1)),
+        maxSacks: maxSacks || 0,
+        maxWeight: maxWeight || 0,
+        totalCompletedSacks: totalCompletedSacks || 0,
+        totalCompletedWeight: totalCompletedWeight || 0,
+        avgCompletedSacks: parseFloat(avgCompletedSacks.toFixed(1)),
+        avgCompletedWeight: parseFloat(avgCompletedWeight.toFixed(1)),
+        maxCompletedSacks: maxCompletedSacks || 0,
+        maxCompletedWeight: maxCompletedWeight || 0,
+        utilizationRate: parseFloat(utilizationRate),
+        driverUtilizationRate: parseFloat(driverUtilizationRate),
+        completionRate: parseFloat(completionRate),
+        cancellationRate: parseFloat(cancellationRate),
+        successRate: parseFloat(successRate),
+        activeUsers: data.activeUsers || 0,
+        pendingUsers: data.pendingUsers || 0,
+        recentRegistrations: data.recentRegistrations || 0,
+        totalLogins: totalLogins || 0,
+        avgLoginCount: parseFloat(avgLoginCount.toFixed(1)),
+        maxLoginCount: maxLoginCount || 0,
+        totalTerritories: formatArrayData(data.territoryAnalytics).length || 0,
+        totalHybrids: formatArrayData(data.hybridAnalytics).length || 0,
+        totalFlaggings: formatArrayData(data.flaggingAnalytics).length || 0,
+      },
+
+      charts: {
+        weeklyDeployments: {
+          labels: processedWeeklyDeployments.map((item) => item.label),
+          completedData: processedWeeklyDeployments.map(
+            (item) => item.completed || 0,
+          ),
+        },
+        dailyDeployments: {
+          labels: processedDailyDeployments.map((item) => item.label),
+          completedData: processedDailyDeployments.map(
+            (item) => item.completed || 0,
+          ),
+        },
+        weeklySacks: {
+          labels: processedWeeklySacks.map((item) => item.label),
+          data: processedWeeklySacks.map((item) => item.totalSacks || 0),
+          deploymentCounts: processedWeeklySacks.map(
+            (item) => item.deploymentCount || 0,
+          ),
+          avgSacks: processedWeeklySacks.map((item) =>
+            parseFloat((item.avgSacksPerDeployment || 0).toFixed(1)),
+          ),
+        },
+        weeklyWeight: {
+          labels: processedWeeklyWeight.map((item) => item.label),
+          data: processedWeeklyWeight.map((item) => item.totalWeight || 0),
+          deploymentCounts: processedWeeklyWeight.map(
+            (item) => item.deploymentCount || 0,
+          ),
+          avgWeight: processedWeeklyWeight.map((item) =>
+            parseFloat((item.avgWeightPerDeployment || 0).toFixed(1)),
+          ),
+        },
+        weeklyWeightBreakdown: (() => {
+          const raw = formatArrayData(data.weeklyWeightBreakdown);
+          return {
+            labels: raw.map((item) =>
+              formatWeekLabel(item._id.year, item._id.month, item._id.week),
+            ),
+            estWeight: raw.map((item) =>
+              parseFloat((item.totalEstWeight || 0).toFixed(2)),
+            ),
+            fieldWeight: raw.map((item) =>
+              parseFloat((item.totalFieldWeight || 0).toFixed(2)),
+            ),
+            plantWeight: raw.map((item) =>
+              parseFloat((item.totalPlantWeight || 0).toFixed(2)),
+            ),
+          };
+        })(),
+        dailyWeightBreakdown: (() => {
+          const raw = formatArrayData(data.dailyWeightBreakdown);
+          return {
+            labels: raw.map((item) =>
+              formatDayLabel(item._id.year, item._id.month, item._id.day),
+            ),
+            estWeight: raw.map((item) =>
+              parseFloat((item.totalEstWeight || 0).toFixed(2)),
+            ),
+            fieldWeight: raw.map((item) =>
+              parseFloat((item.totalFieldWeight || 0).toFixed(2)),
+            ),
+            plantWeight: raw.map((item) =>
+              parseFloat((item.totalPlantWeight || 0).toFixed(2)),
+            ),
+          };
+        })(),
+        deploymentStatus: {
+          labels: deploymentStatusData.map(
+            (item) => deploymentStatusMap[item._id] || item._id || "Unknown",
+          ),
+          data: deploymentStatusData.map((item) => item.count || 0),
+        },
+        pickupSites: {
+          data: formattedPickupSites,
+          labels: formattedPickupSites.map((item) => item.name),
+          counts: formattedPickupSites.map((item) => item.count),
+          sacks: formattedPickupSites.map((item) => item.totalSacks),
+          weights: formattedPickupSites.map((item) => item.totalWeight),
+        },
+        truckTypes: {
+          labels: formatArrayData(data.truckTypeAnalytics).map(
+            (item) => item._id || "Unknown",
+          ),
+          data: formatArrayData(data.truckTypeAnalytics).map(
+            (item) => item.count || 0,
+          ),
+        },
+        truckStatus: {
+          labels: formatArrayData(data.truckStatusAnalytics).map(
+            (item) => item._id || "Unknown",
+          ),
+          data: formatArrayData(data.truckStatusAnalytics).map(
+            (item) => item.count || 0,
+          ),
+        },
+        driverStatus: {
+          labels: formatArrayData(data.driverStatusAnalytics).map(
+            (item) => item._id || "Unknown",
+          ),
+          data: formatArrayData(data.driverStatusAnalytics).map(
+            (item) => item.count || 0,
+          ),
+        },
+        userRoles: {
+          labels: userRoleData.map((item) => {
+            const userRoleMap = {
+              head_admin: "Head Admin",
+              admin: "Admin",
+              visitor: "Visitor",
+              subcon: "Subcontractor",
+            };
+            return userRoleMap[item._id] || item._id || "Unknown";
+          }),
+          data: userRoleData.map((item) => item.count || 0),
+        },
+        userStatus: {
+          labels: userStatusData.map((item) => {
+            const userStatusMap = {
+              active: "Active",
+              inactive: "Inactive",
+              pending: "Pending",
+              rejected: "Rejected",
+              revoked: "Revoked",
+            };
+            return userStatusMap[item._id] || item._id || "Unknown";
+          }),
+          data: userStatusData.map((item) => item.count || 0),
+        },
+        subconDistribution: {
+          labels: subconData.map((item) => item._id || "Unknown"),
+          data: subconData.map((item) => item.count || 0),
+        },
+        subconPerformance: {
+          data: formattedSubconPerformance,
+          labels: formattedSubconPerformance.map((item) => item.name),
+          totalDeployments: formattedSubconPerformance.map(
+            (item) => item.totalDeployments,
+          ),
+          completedDeployments: formattedSubconPerformance.map(
+            (item) => item.completedDeployments,
+          ),
+          completionRates: formattedSubconPerformance.map((item) =>
+            parseFloat(item.completionRate),
+          ),
+          statusBreakdown: formattedSubconPerformance.map(
+            (item) => item.statusBreakdown,
+          ),
+        },
+        territoryDistribution: {
+          labels: formatArrayData(data.territoryAnalytics).map(
+            (item) => item._id || "Unknown",
+          ),
+          data: formatArrayData(data.territoryAnalytics).map(
+            (item) => item.count || 0,
+          ),
+        },
+        hybridDistribution: {
+          labels: formatArrayData(data.hybridAnalytics).map(
+            (item) => item._id || "Unknown",
+          ),
+          data: formatArrayData(data.hybridAnalytics).map(
+            (item) => item.count || 0,
+          ),
+        },
+        flaggingDistribution: {
+          labels: formatArrayData(data.flaggingAnalytics).map(
+            (item) => item._id || "Unknown",
+          ),
+          data: formatArrayData(data.flaggingAnalytics).map(
+            (item) => item.count || 0,
+          ),
+        },
+        territoryPerformance: {
+          data: formattedTerritoryPerformance,
+          labels: formattedTerritoryPerformance.map((item) => item.name),
+          totalDeployments: formattedTerritoryPerformance.map(
+            (item) => item.totalDeployments,
+          ),
+          completedDeployments: formattedTerritoryPerformance.map(
+            (item) => item.completedDeployments,
+          ),
+          completionRates: formattedTerritoryPerformance.map((item) =>
+            parseFloat(item.completionRate),
+          ),
+          statusBreakdown: formattedTerritoryPerformance.map(
+            (item) => item.statusBreakdown,
+          ),
+        },
+        hybridPerformance: {
+          data: formattedHybridPerformance,
+          labels: formattedHybridPerformance.map((item) => item.name),
+          totalDeployments: formattedHybridPerformance.map(
+            (item) => item.totalDeployments,
+          ),
+          completedDeployments: formattedHybridPerformance.map(
+            (item) => item.completedDeployments,
+          ),
+          completionRates: formattedHybridPerformance.map((item) =>
+            parseFloat(item.completionRate),
+          ),
+          statusBreakdown: formattedHybridPerformance.map(
+            (item) => item.statusBreakdown,
+          ),
+        },
+        flaggingPerformance: {
+          data: formattedFlaggingPerformance,
+          labels: formattedFlaggingPerformance.map((item) => item.name),
+          totalDeployments: formattedFlaggingPerformance.map(
+            (item) => item.totalDeployments,
+          ),
+          completedDeployments: formattedFlaggingPerformance.map(
+            (item) => item.completedDeployments,
+          ),
+          completionRates: formattedFlaggingPerformance.map((item) =>
+            parseFloat(item.completionRate),
+          ),
+          statusBreakdown: formattedFlaggingPerformance.map(
+            (item) => item.statusBreakdown,
+          ),
+        },
+      },
+
+      topDrivers: formatArrayData(data.topDriversByTrips),
+      territoryMetrics: formattedTerritoryMetrics,
+
+      hybridMetrics: formatArrayData(data.hybridPerformance).map((item) => ({
+        _id: item._id || "Unknown",
+        count: item.count || 0,
+        totalSacks: item.totalSacks || 0,
+        totalWeight: item.totalWeight || 0,
+        avgSacks: parseFloat((item.avgSacks || 0).toFixed(1)),
+        avgWeight: parseFloat((item.avgWeight || 0).toFixed(1)),
+      })),
+
+      flaggingMetrics: formatArrayData(data.flaggingPerformance).map(
+        (item) => ({
+          _id: item._id || "Unknown",
+          count: item.count || 0,
+          totalSacks: item.totalSacks || 0,
+          totalWeight: item.totalWeight || 0,
+          avgSacks: parseFloat((item.avgSacks || 0).toFixed(1)),
+          avgWeight: parseFloat((item.avgWeight || 0).toFixed(1)),
+        }),
+      ),
+
+      performanceMetrics: {
+        totalDeployments,
+        completedDeployments: data.completedDeployments,
+        // FIX: ongoingDeployments now uses the corrected totalOngoingDeployments
+        ongoingDeployments: totalOngoingDeployments,
+        cancelledDeployments: data.cancelledDeployments || 0,
+        preparingDeployments: data.preparingDeployments || 0,
+        // ongoing-only count, used for the subtitle on the Active Deployments card
+        activeOngoingDeployments: data.ongoingDeployments || 0,
+        totalTrucks: data.totalTrucks,
+        activeTrucks: data.activeTrucks,
+        availableTrucks: data.availableTrucks,
+        deployedTrucks: data.deployedTrucks,
+        totalDrivers: data.totalDrivers,
+        availableDrivers: data.availableDrivers,
+        deployedDrivers: data.deployedDrivers,
+        totalSacks: totalSacks || 0,
+        totalWeight: totalWeight || 0,
+        avgSacksPerDeployment: parseFloat(avgSacks.toFixed(1)),
+        avgWeightPerDeployment: parseFloat(avgWeight.toFixed(1)),
+        maxSacks: maxSacks || 0,
+        maxWeight: maxWeight || 0,
+        totalCompletedSacks: totalCompletedSacks || 0,
+        totalCompletedWeight: totalCompletedWeight || 0,
+        avgCompletedSacks: parseFloat(avgCompletedSacks.toFixed(1)),
+        avgCompletedWeight: parseFloat(avgCompletedWeight.toFixed(1)),
+        maxCompletedSacks: maxCompletedSacks || 0,
+        maxCompletedWeight: maxCompletedWeight || 0,
+        completionRate: parseFloat(completionRate),
+        cancellationRate: parseFloat(cancellationRate),
+        successRate: parseFloat(successRate),
+        utilizationRate: parseFloat(utilizationRate),
+        driverUtilizationRate: parseFloat(driverUtilizationRate),
+        recentActivity: data.recentActivity || 0,
+        monthlyDeployments: data.monthlyDeployments || 0,
+        yearlyDeployments: data.yearlyDeployments || 0,
+        totalUsers: data.totalUsers || 0,
+        activeUsers: data.activeUsers || 0,
+        pendingUsers: data.pendingUsers || 0,
+        recentRegistrations: data.recentRegistrations || 0,
+        totalLogins: totalLogins || 0,
+        avgLoginCount: parseFloat(avgLoginCount.toFixed(1)),
+        maxLoginCount: maxLoginCount || 0,
+        territoryCount: formatArrayData(data.territoryAnalytics).length || 0,
+        hybridCount: formatArrayData(data.hybridAnalytics).length || 0,
+        flaggingCount: formatArrayData(data.flaggingAnalytics).length || 0,
+      },
+    };
+
+    if (req.user.role === "subcon" && req.user.subcon) {
+      analyticsData.subconAnalytics = {
+        drivers: {
+          performance: formatArrayData(data.subconDriverPerformance),
+          status: formatArrayData(data.subconDriverStatusAnalytics),
+          total: data.totalDrivers || 0,
+          available: data.availableDrivers || 0,
+          deployed: data.deployedDrivers || 0,
+        },
+        trucks: {
+          performance: formatArrayData(data.subconTruckPerformance),
+          status: formatArrayData(data.subconTruckStatusAnalytics),
+          types: formatArrayData(data.subconTruckTypeAnalytics),
+          total: data.totalTrucks || 0,
+          available: data.availableTrucks || 0,
+          deployed: data.deployedTrucks || 0,
+        },
+        territories: {
+          distribution: formatArrayData(data.territoryAnalytics),
+          performance: formatArrayData(data.territoryPerformance),
+        },
+        hybrids: {
+          distribution: formatArrayData(data.hybridAnalytics),
+          performance: formatArrayData(data.hybridPerformance),
+        },
+        flaggings: {
+          distribution: formatArrayData(data.flaggingAnalytics),
+          performance: formatArrayData(data.flaggingPerformance),
+        },
+      };
+    }
+
+    res.json({
+      success: true,
+      data: analyticsData,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("Analytics error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching analytics data",
+      error: error.message,
+    });
+  }
+};
+
+module.exports = { getDashboardAnalytics };

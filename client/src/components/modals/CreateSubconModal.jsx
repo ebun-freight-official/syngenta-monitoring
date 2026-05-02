@@ -1,0 +1,397 @@
+import React, { useEffect, useState } from "react";
+import {
+  Dialog,
+  DialogBackdrop,
+  DialogPanel,
+  Transition,
+  TransitionChild,
+} from "@headlessui/react";
+import { IoClose } from "react-icons/io5";
+import { MdKeyboardArrowDown } from "react-icons/md";
+import { TbCheck } from "react-icons/tb";
+import { toast } from "react-toastify";
+import clsx from "clsx";
+import useCreateUser from "../../hooks/useCreateUser";
+import { useSettingsContext } from "../../contexts/SettingsContext";
+import { TbUpload } from "react-icons/tb";
+import ActionButton from "../ui/ActionButton";
+
+/* ─── Decorative dot pattern ────────────────────────────────────────────── */
+const DotPattern = () => (
+  <svg
+    className="absolute inset-0 w-full h-full opacity-10 pointer-events-none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <defs>
+      <pattern
+        id="dots-create-subcon"
+        x="0"
+        y="0"
+        width="20"
+        height="20"
+        patternUnits="userSpaceOnUse"
+      >
+        <circle cx="2" cy="2" r="1.5" fill="white" />
+      </pattern>
+    </defs>
+    <rect width="100%" height="100%" fill="url(#dots-create-subcon)" />
+  </svg>
+);
+
+function CreateSubconModal({ isOpen, onClose, onCreate }) {
+  const { settings } = useSettingsContext();
+
+  const emptyForm = {
+    firstname: "",
+    lastname: "",
+    email: "",
+    phoneNo: "",
+    role: "subcon",
+    status: "active",
+    subcon: "",
+    password: "",
+    confirmPassword: "",
+    image: {},
+  };
+
+  const [formData, setFormData] = useState(emptyForm);
+  const [previewImage, setPreviewImage] = useState(null);
+  const { createUserFunction, isLoading } = useCreateUser();
+
+  const handleCloseModal = () => {
+    if (previewImage) URL.revokeObjectURL(previewImage);
+    onClose();
+    setPreviewImage(null);
+    setFormData(emptyForm);
+  };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setPreviewImage(URL.createObjectURL(file));
+      setFormData((prev) => ({ ...prev, image: file }));
+    } else {
+      setPreviewImage(null);
+      setFormData((prev) => ({ ...prev, image: null }));
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const result = await createUserFunction(formData);
+    if (result.user) {
+      toast.success(result.message);
+      onCreate(result.user);
+      handleCloseModal();
+    } else {
+      toast.error(result);
+    }
+  };
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") handleCloseModal();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen]);
+
+  return (
+    <Transition show={isOpen} as={React.Fragment}>
+      <Dialog onClose={() => {}} className="relative z-50">
+        <TransitionChild
+          as={React.Fragment}
+          enter="ease-out duration-300"
+          enterFrom="opacity-0"
+          enterTo="opacity-100"
+          leave="ease-in duration-200"
+          leaveFrom="opacity-100"
+          leaveTo="opacity-0"
+        >
+          <DialogBackdrop className="fixed inset-0 bg-black/40 backdrop-blur-sm" />
+        </TransitionChild>
+
+        <div className="fixed inset-0 flex items-center justify-center p-4 max-md:p-2">
+          <TransitionChild
+            as={React.Fragment}
+            enter="duration-500 ease-out"
+            enterFrom="-translate-y-full opacity-0"
+            enterTo="translate-y-0 opacity-100"
+            leave="duration-400 ease-in"
+            leaveFrom="translate-y-0 opacity-100"
+            leaveTo="-translate-y-full opacity-0"
+          >
+            <DialogPanel className="font-poppins w-full max-w-4xl rounded-xl bg-white shadow-lg overflow-hidden flex flex-col md:flex-row">
+              {/* ══ LEFT PANEL ══════════════════════════════════════════════════ */}
+              <div
+                className="relative flex justify-start flex-col md:justify-center overflow-hidden md:w-64 shrink-0 p-6 max-md:p-4"
+                style={{
+                  background:
+                    "linear-gradient(155deg, #020617 0%, #001e36 55%, #0f172a 100%)",
+                }}
+              >
+                <div
+                  className="absolute -top-16 -right-16 w-56 h-56 rounded-full opacity-10 pointer-events-none"
+                  style={{
+                    background:
+                      "radial-gradient(circle, #475569 0%, transparent 70%)",
+                  }}
+                />
+                <div
+                  className="absolute -bottom-12 -left-12 w-44 h-44 rounded-full opacity-10 pointer-events-none"
+                  style={{
+                    background:
+                      "radial-gradient(circle, #334155 0%, transparent 70%)",
+                  }}
+                />
+                <DotPattern />
+
+                <p className="text-xxxs md:text-xxs font-semibold text-white/50 uppercase tracking-wider mb-2">
+                  Upload Image
+                </p>
+
+                <div className="relative z-10 w-full max-md:w-18 aspect-square rounded-md overflow-hidden cursor-pointer group border border-white/20 hover:border-white/30 transition-all">
+                  {previewImage ? (
+                    <img
+                      src={previewImage}
+                      alt="Preview"
+                      className="w-full h-full object-cover object-center"
+                    />
+                  ) : (
+                    <div
+                      className="h-full w-full rounded-md"
+                      style={{
+                        background:
+                          "linear-gradient(155deg, #020617 0%, #001e36 55%, #0f172a 100%)",
+                      }}
+                    />
+                  )}
+                  <div className="absolute inset-0 bg-black/20 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 group-hover:transition-opacity text-white/40 gap-1">
+                    <TbUpload className="text-xl max-md:text-base" />
+                    <span className="text-xxs font-medium max-md:hidden">
+                      Upload Photo
+                    </span>
+                  </div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    className="absolute inset-0 opacity-0 cursor-pointer"
+                  />
+                </div>
+              </div>
+
+              {/* ══ RIGHT PANEL ═════════════════════════════════════════════════ */}
+              <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+                {/* Header */}
+                <div className="flex items-start justify-between px-6 pt-5 pb-4 max-md:px-4 max-md:pt-4 max-md:pb-3 border-b border-gray-200 shrink-0">
+                  <div>
+                    <h2 className="text-gray-900 font-bold text-base max-md:text-sm">
+                      Create New Subcon
+                    </h2>
+                    <p className="text-gray-400 text-xxs mt-0.5">
+                      Fill in the details to add a new subcon account.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleCloseModal}
+                    disabled={isLoading}
+                    className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1.5 rounded-md text-lg transition-all cursor-pointer disabled:opacity-40 shrink-0 ml-4"
+                  >
+                    <IoClose />
+                  </button>
+                </div>
+
+                {/* Form */}
+                <form onSubmit={handleSubmit} className="flex-1 flex flex-col">
+                  <div className="flex-1 px-6 py-5 max-md:px-4 max-md:pt-4 grid grid-cols-2 gap-x-4 gap-y-4 max-md:gap-x-3 max-md:gap-y-3 content-start">
+                    <InputField
+                      label="First Name"
+                      type="text"
+                      name="firstname"
+                      placeholder="First name"
+                      value={formData.firstname}
+                      onChange={handleChange}
+                      disabled={isLoading}
+                    />
+                    <InputField
+                      label="Last Name"
+                      type="text"
+                      name="lastname"
+                      placeholder="Last name"
+                      value={formData.lastname}
+                      onChange={handleChange}
+                      disabled={isLoading}
+                    />
+                    <InputField
+                      label="Email"
+                      type="email"
+                      name="email"
+                      placeholder="you@example.com"
+                      value={formData.email}
+                      onChange={handleChange}
+                      disabled={isLoading}
+                      isCapitalize={false}
+                    />
+                    <InputField
+                      label="Phone No."
+                      type="tel"
+                      name="phoneNo"
+                      placeholder="09XXXXXXXXX"
+                      pattern="^(09|\+639)\d{9}$"
+                      value={formData.phoneNo}
+                      onChange={handleChange}
+                      disabled={isLoading}
+                      maxLength={11}
+                    />
+
+                    {/* Subcon — full width */}
+                    <div className="col-span-2">
+                      <SelectField
+                        label="Subcon"
+                        name="subcon"
+                        value={formData.subcon}
+                        onChange={handleChange}
+                        disabled={isLoading}
+                        required
+                      >
+                        <option value="" disabled>
+                          Select subcon
+                        </option>
+                        {settings.trucksDrivers.subcon.map((item, i) => (
+                          <option key={i} value={item}>
+                            {item}
+                          </option>
+                        ))}
+                      </SelectField>
+                    </div>
+
+                    <InputField
+                      label="Password"
+                      type="password"
+                      name="password"
+                      placeholder="Min. 8 characters"
+                      value={formData.password}
+                      onChange={handleChange}
+                      disabled={isLoading}
+                      isCapitalize={false}
+                    />
+                    <InputField
+                      label="Confirm Password"
+                      type="password"
+                      name="confirmPassword"
+                      placeholder="Re-enter password"
+                      value={formData.confirmPassword}
+                      onChange={handleChange}
+                      disabled={isLoading}
+                      isCapitalize={false}
+                    />
+                  </div>
+
+                  {/* Actions */}
+                  <div className="px-6 pb-5 pt-4 max-md:px-4 max-md:pb-4 border-t border-gray-200 shrink-0">
+                    <ActionButton
+                      icon={TbCheck}
+                      color="green"
+                      type="submit"
+                      title="Create subcon"
+                      text="Create"
+                      loadingText="Creating"
+                      isLoading={isLoading}
+                    />
+                  </div>
+                </form>
+              </div>
+            </DialogPanel>
+          </TransitionChild>
+        </div>
+      </Dialog>
+    </Transition>
+  );
+}
+
+/* ─── InputField ─────────────────────────────────────────────────────────── */
+const InputField = ({
+  label,
+  type,
+  name,
+  placeholder,
+  value,
+  onChange,
+  disabled,
+  pattern,
+  maxLength,
+  isRequired = true,
+  isCapitalize = true,
+  isUppercase = false,
+}) => (
+  <label className="flex flex-col gap-1.5">
+    <span className="text-xxxs md:text-xxs font-semibold text-gray-600 uppercase tracking-wider">
+      {label} {isRequired && <span className="text-red-400">*</span>}
+    </span>
+    <div
+      className={clsx(
+        "flex items-center border rounded-md px-4 py-3 max-md:px-3 max-md:py-2.5 transition-all duration-200",
+        disabled
+          ? "bg-gray-50 border-gray-200"
+          : "bg-white border-gray-200 focus-within:border-gray-400",
+      )}
+    >
+      <input
+        type={type}
+        name={name}
+        placeholder={placeholder}
+        value={value}
+        minLength={2}
+        maxLength={maxLength || 50}
+        pattern={pattern}
+        onChange={onChange}
+        disabled={disabled}
+        required={isRequired}
+        className={clsx(
+          "flex-1 text-xs max-md:text-xxs placeholder-gray-400 bg-transparent focus:outline-none min-w-0",
+          disabled ? "text-gray-500" : "text-gray-800",
+          { capitalize: isCapitalize && !isUppercase, uppercase: isUppercase },
+        )}
+      />
+    </div>
+  </label>
+);
+
+/* ─── SelectField ────────────────────────────────────────────────────────── */
+const SelectField = ({
+  label,
+  name,
+  value,
+  onChange,
+  disabled,
+  required,
+  children,
+}) => (
+  <div className="flex flex-col gap-1.5">
+    <span className="text-xxxs md:text-xxs font-semibold text-gray-600 uppercase tracking-wider">
+      {label} {required && <span className="text-red-400">*</span>}
+    </span>
+    <div className="relative flex items-center bg-white border border-gray-200 rounded-md px-4 py-3 max-md:px-3 max-md:py-2.5 focus-within:border-gray-400 transition-all">
+      <select
+        name={name}
+        value={value}
+        onChange={onChange}
+        disabled={disabled}
+        required={required}
+        className="w-full appearance-none bg-transparent text-xs max-md:text-xxs text-gray-800 focus:outline-none capitalize"
+      >
+        {children}
+      </select>
+      <MdKeyboardArrowDown className="absolute right-3 text-gray-400 text-base pointer-events-none" />
+    </div>
+  </div>
+);
+
+export default CreateSubconModal;
