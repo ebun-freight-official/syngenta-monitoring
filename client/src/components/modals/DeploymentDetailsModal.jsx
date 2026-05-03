@@ -13,24 +13,17 @@ import {
 import clsx from "clsx";
 import { IoClose } from "react-icons/io5";
 import { DEPLOYMENT_STATUS } from "../../utils/generalOptions";
-import { MdKeyboardArrowDown, MdKeyboardArrowUp } from "react-icons/md";
+import { MdKeyboardArrowDown } from "react-icons/md";
 import { useEffect, useState } from "react";
 import { DateTime } from "luxon";
 import useUpdateDeployment from "../../hooks/useUpdateDeployment";
 import { toast } from "react-toastify";
-import { HiDotsHorizontal } from "react-icons/hi";
 import { NumericFormat } from "react-number-format";
 import { useUserContext } from "../../contexts/UserContext";
 import { useSettingsContext } from "../../contexts/SettingsContext";
 import {
-  TbDeviceFloppy,
   TbExchange,
-  TbPencilMinus,
   TbPrinter,
-  TbTrash,
-  TbReportMoney,
-  TbArrowBarToDown,
-  TbArrowBigDownLines,
   TbArrowBigDownLine,
   TbArrowBigUpLine,
   TbReceipt,
@@ -42,17 +35,14 @@ import {
   RiCheckLine,
 } from "react-icons/ri";
 import { FiPlus, FiTrash2 } from "react-icons/fi";
-import { PiMapPinAreaFill } from "react-icons/pi";
-import jsPDF from "jspdf";
-import { API_DEPLOYMENT } from "../../utils/APIRoutes";
-import axios from "axios";
-import { SMC_HEADER_IMAGE } from "../../consts/base_64_images";
 import { useRef } from "react";
 import { FaCalendar } from "react-icons/fa";
 import { exportTMOToPDF } from "../../utils/exportTMOToPDF";
-import { RxDragHandleDots2 } from "react-icons/rx";
 import ActionButton from "../ui/ActionButton";
+import InputField from "../ui/InputField";
+import SelectField from "../ui/SelectField";
 import React from "react";
+import ComboboxField from "../ui/ComboboxField";
 
 const MAX_PICKUPS = 10;
 
@@ -66,6 +56,10 @@ const defaultPickup = {
   pickupIn: "",
   pickupOut: "",
   sacksCount: 0,
+  hybrid: "",
+  territory: "",
+  flagging: "",
+  flaggingRemarks: "",
 };
 
 const DotPattern = () => (
@@ -163,7 +157,6 @@ function DeploymentDetailsModal({
     }));
   };
 
-  // ── Drag-and-drop reorder ──────────────────────────────────────────────────
   const reorderPickups = (fromIndex, toIndex) => {
     if (fromIndex === toIndex) return;
     setEditForm((prev) => {
@@ -196,30 +189,6 @@ function DeploymentDetailsModal({
     } else {
       toast.error(result.error);
     }
-  };
-
-  const capitalizeWords = (str) => {
-    if (!str) return "";
-    return str
-      .toLowerCase()
-      .split(" ")
-      .map((word) =>
-        word.includes("(") || word.includes(")")
-          ? word.replace(/\b\w/g, (c) => c.toUpperCase())
-          : word.charAt(0).toUpperCase() + word.slice(1),
-      )
-      .join(" ");
-  };
-
-  const formatTruckType = (type) =>
-    type ? capitalizeWords(type.replace(/-/g, " ")) : "";
-
-  const formatNumber = (value) => {
-    if (!value || value === "" || isNaN(value)) return "";
-    return parseFloat(value).toLocaleString("en-US", {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2,
-    });
   };
 
   const handlePrintTMO = () =>
@@ -313,13 +282,6 @@ function DeploymentDetailsModal({
   const pickups = editForm?.pickups || [];
   const lastPickupOut = pickups[pickups.length - 1]?.pickupOut;
 
-  const statusColorMap = {
-    preparing: "bg-orange-50 text-orange-600 border-orange-100",
-    ongoing: "bg-emerald-50 text-emerald-600 border-emerald-100",
-    completed: "bg-blue-50 text-blue-600 border-blue-100",
-    canceled: "bg-red-50 text-red-600 border-red-100",
-  };
-
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e) => {
@@ -332,7 +294,6 @@ function DeploymentDetailsModal({
   return (
     <Transition show={isOpen} as={React.Fragment}>
       <Dialog onClose={() => {}} className="relative z-50">
-        {/* ── Backdrop ── */}
         <TransitionChild
           as={React.Fragment}
           enter="ease-out duration-300"
@@ -346,7 +307,6 @@ function DeploymentDetailsModal({
         </TransitionChild>
 
         <div className="fixed inset-0 flex items-center justify-center p-4 max-sm:p-2">
-          {/* ── Panel slide-from-top transition (matches other modals) ── */}
           <TransitionChild
             as={React.Fragment}
             enter="duration-500 ease-out"
@@ -391,7 +351,6 @@ function DeploymentDetailsModal({
                         <span className="text-white/50 text-xxxs max-md:text-[0.4rem] uppercase tracking-wider font-semibold mb-0.5">
                           TMO
                         </span>
-
                         <span className="text-white/90 text-xs max-md:text-[0.6rem] font-medium">
                           {deployment?.isTMOPrinted ? (
                             <span className="flex items-center max-sm:gap-1.5 gap-2">
@@ -410,7 +369,6 @@ function DeploymentDetailsModal({
                         <span className="text-white/50 text-xxxs max-md:text-[0.4rem] uppercase tracking-wider font-semibold mb-0.5">
                           Pay Slip
                         </span>
-
                         <span className="text-white/90 text-xs max-md:text-[0.6rem] font-medium">
                           {deployment?.isPaySlipPrinted ? (
                             <span className="flex items-center max-sm:gap-1.5 gap-2">
@@ -432,18 +390,15 @@ function DeploymentDetailsModal({
                         <span className="text-white/50 text-xxxs max-md:text-[0.4rem] uppercase tracking-wider font-semibold mb-0.5">
                           Pickup Stops
                         </span>
-
                         <span className="text-white/90 text-xs max-md:text-[0.6rem] font-medium">
                           {deployment?.pickups?.length}{" "}
                           {deployment?.pickups?.length > 1 ? "Stops" : "Stop"}
                         </span>
                       </div>
-
                       <div className="flex flex-col items-start">
                         <span className="text-white/50 text-xxxs max-md:text-[0.4rem] uppercase tracking-wider font-semibold mb-0.5">
                           Status
                         </span>
-
                         <span className="text-white/90 text-xs max-md:text-[0.6rem] font-medium capitalize">
                           <span className="flex items-center max-sm:gap-1.5 gap-2">
                             {deployment?.status}
@@ -744,12 +699,10 @@ function DeploymentDetailsModal({
 
                   {["head_admin", "admin"].includes(userData?.data?.role) && (
                     <div className="ml-auto flex items-center max-lg:hidden gap-4">
-                      <p className=" text-xs font-medium tracking-wide text-gray-600 font-mono bg-gray-200 px-2 py-0.5 rounded-sm">
+                      <p className="text-xs font-medium tracking-wide text-gray-600 font-mono bg-gray-200 px-2 py-0.5 rounded-sm">
                         {deployment?.deploymentCode}
                       </p>
-
                       <div className="border-l border-gray-200 h-full"></div>
-
                       <div className="flex items-center gap-1.5 text-xxs font-medium text-gray-500">
                         {editForm?.isTMOPrinted
                           ? "PAYSLIP PRINTED"
@@ -764,9 +717,7 @@ function DeploymentDetailsModal({
                           )}
                         />
                       </div>
-
                       <div className="border-l border-gray-200 h-full"></div>
-
                       <div className="flex items-center gap-1.5 text-xxs font-medium text-gray-500">
                         {editForm?.isTMOPrinted
                           ? "TMO PRINTED"
@@ -885,7 +836,6 @@ function DeploymentDetailsModal({
                             onClick={() => openPaySlipModal()}
                             title="Pay Slip"
                           />
-
                           <div className="ml-auto">
                             <ActionButton
                               icon={RiDeleteBin6Line}
@@ -909,6 +859,8 @@ function DeploymentDetailsModal({
 }
 
 // ── DARK TIMELINE HELPERS ──────────────────────────────────────────────────────
+// Note: These are intentionally kept separate — they use a dark theme
+// (white/transparent colors) that doesn't match the reusable light InputField.
 
 const DarkTimelineLabel = ({ isActive, label }) => (
   <div className="flex gap-4">
@@ -949,11 +901,7 @@ const DarkTimelineStop = ({ isActive, isLast, children }) => (
         )}
       />
     </div>
-    <div
-      className={clsx("flex-1 min-w-0", {
-        "pb-5": !isLast,
-      })}
-    >
+    <div className={clsx("flex-1 min-w-0", { "pb-5": !isLast })}>
       {children}
     </div>
   </div>
@@ -1393,6 +1341,7 @@ const DeploymentInfoTab = ({
 
   return (
     <div className="space-y-5">
+      {/* ── Truck & Driver ── */}
       <div className="space-y-2">
         <div className="relative flex justify-between">
           <h3 className="text-xxxs md:text-xxs font-semibold text-gray-600 uppercase tracking-wider">
@@ -1406,7 +1355,6 @@ const DeploymentInfoTab = ({
                   className="underline cursor-pointer"
                   onClick={openReplacementHistory}
                 >
-                  {" "}
                   Click to view
                 </span>
               </p>
@@ -1424,99 +1372,55 @@ const DeploymentInfoTab = ({
         </div>
 
         <div className="grid grid-cols-1 xs:grid-cols-2 gap-x-4 gap-y-4 max-sm:gap-x-3 max-sm:gap-y-3 border border-gray-200 rounded-md p-5 max-sm:p-4">
-          <InfoField label="Plate No.">
-            {isEditMode ? (
-              <Combobox
-                value={activeTruckId}
-                onChange={(v) =>
-                  handleComboboxChange(
-                    isReplacementShow
-                      ? "replacement.replacementTruckId"
-                      : "truckId",
-                    v,
-                  )
-                }
-              >
-                <div className="relative flex items-center bg-white border border-gray-200 rounded-md px-4 py-3 max-sm:px-3 max-sm:py-2.5 focus-within:border-gray-400 transition-all">
-                  <ComboboxInput
-                    className="w-full bg-transparent text-xs max-sm:text-xxs text-gray-800 placeholder-gray-400 focus:outline-none uppercase min-w-0"
-                    displayValue={(id) =>
-                      trucks?.find((t) => t._id === id)?.plateNo || ""
-                    }
-                    onChange={(e) =>
-                      isReplacementShow
-                        ? setReplacementTruckQuery(e.target.value)
-                        : setTruckQuery(e.target.value)
-                    }
-                    required
-                  />
-                  <ComboboxButton className="absolute right-4 max-sm:right-3 text-gray-400">
-                    <MdKeyboardArrowDown className="text-base" />
-                  </ComboboxButton>
-                </div>
-                <ComboboxOptions
-                  portal
-                  anchor={{ to: "bottom start", gap: 8 }}
-                  className="z-999 max-h-60 w-(--input-width) overflow-auto rounded-md bg-white border border-gray-200 py-1 text-xs focus:outline-none"
-                >
-                  {(isReplacementShow
-                    ? filteredReplacementTrucks
-                    : filteredTrucks
-                  ).map((t) => (
-                    <ComboboxOption
-                      key={t._id}
-                      value={t._id}
-                      className={({ focus }) =>
-                        clsx(
-                          "px-4 py-2 cursor-default select-none uppercase transition-colors",
-                          { "bg-gray-50": focus },
-                        )
-                      }
-                    >
-                      {t.plateNo}
-                    </ComboboxOption>
-                  ))}
-                </ComboboxOptions>
-              </Combobox>
-            ) : (
-              <InfoValue className="uppercase">
-                {isReplacementShow
-                  ? editForm?.replacement?.replacementTruckId?.plateNo
-                  : currentTruck?.plateNo}
-              </InfoValue>
-            )}
-          </InfoField>
+          {/* Plate No */}
+          <ComboboxField
+            label="Plate No."
+            value={activeTruckId}
+            onChange={(v) =>
+              handleComboboxChange(
+                isReplacementShow
+                  ? "replacement.replacementTruckId"
+                  : "truckId",
+                v,
+              )
+            }
+            onQueryChange={
+              isReplacementShow ? setReplacementTruckQuery : setTruckQuery
+            }
+            allOptions={
+              trucks?.map((t) => ({ id: t._id, label: t.plateNo })) || []
+            }
+            options={(isReplacementShow
+              ? filteredReplacementTrucks
+              : filteredTrucks
+            ).map((t) => ({ id: t._id, label: t.plateNo }))}
+            disabled={!isEditMode}
+            uppercase
+          />
 
           <div className="grid grid-cols-2 gap-4">
-            <InfoField label="Truck Type">
-              {isEditMode ? (
-                <SelectWrapper
-                  name={
-                    isReplacementShow
-                      ? "replacement.replacementTruckType"
-                      : "truckType"
-                  }
-                  value={
-                    isReplacementShow
-                      ? editForm?.replacement?.replacementTruckType
-                      : editForm?.truckType
-                  }
-                  onChange={handleChange}
-                >
-                  {settings.trucksDrivers.truckType.map((item, i) => (
-                    <option key={i} value={item}>
-                      {item}
-                    </option>
-                  ))}
-                </SelectWrapper>
-              ) : (
-                <InfoValue className="capitalize">
-                  {isReplacementShow
-                    ? editForm?.replacement?.replacementTruckType
-                    : editForm?.truckType}
-                </InfoValue>
-              )}
-            </InfoField>
+            <SelectField
+              label="Truck Type"
+              name={
+                isReplacementShow
+                  ? "replacement.replacementTruckType"
+                  : "truckType"
+              }
+              value={
+                isReplacementShow
+                  ? editForm?.replacement?.replacementTruckType
+                  : editForm?.truckType
+              }
+              onChange={handleChange}
+              disabled={!isEditMode}
+            >
+              {settings.trucksDrivers.truckType.map((item, i) => (
+                <option key={i} value={item}>
+                  {item}
+                </option>
+              ))}
+            </SelectField>
+
             <InputField
               label="Helper Count"
               type="number"
@@ -1524,77 +1428,40 @@ const DeploymentInfoTab = ({
               value={editForm?.helperCount}
               disabled={!isEditMode}
               onChange={handleChange}
-              formatNumber
+              numeric
             />
           </div>
 
-          <InfoField label="Driver">
-            {isEditMode ? (
-              <Combobox
-                value={activeDriverId}
-                onChange={(v) =>
-                  handleComboboxChange(
-                    isReplacementShow
-                      ? "replacement.replacementDriverId"
-                      : "driverId",
-                    v,
-                  )
-                }
-              >
-                <div className="relative flex items-center bg-white border border-gray-200 rounded-md px-4 py-3 max-sm:px-3 max-sm:py-2.5 focus-within:border-gray-400 transition-all">
-                  <ComboboxInput
-                    className="w-full bg-transparent text-xs max-sm:text-xxs text-gray-800 placeholder-gray-400 focus:outline-none capitalize min-w-0"
-                    displayValue={(id) => {
-                      const d = drivers?.find((d) => d._id === id);
-                      return d ? `${d.firstname} ${d.lastname}` : "";
-                    }}
-                    onChange={(e) =>
-                      isReplacementShow
-                        ? setReplacementDriverQuery(e.target.value)
-                        : setDriverQuery(e.target.value)
-                    }
-                    required
-                  />
-                  <ComboboxButton className="absolute right-4 max-sm:right-3 text-gray-400">
-                    <MdKeyboardArrowDown className="text-base" />
-                  </ComboboxButton>
-                </div>
-                <ComboboxOptions
-                  portal
-                  anchor={{ to: "bottom start", gap: 8 }}
-                  className="z-999 max-h-60 w-(--input-width) overflow-auto rounded-md bg-white border border-gray-200 py-1 text-xs focus:outline-none"
-                >
-                  {(isReplacementShow
-                    ? filteredReplacementDrivers
-                    : filteredDrivers
-                  ).map((d) => (
-                    <ComboboxOption
-                      key={d._id}
-                      value={d._id}
-                      className={({ focus }) =>
-                        clsx(
-                          "px-4 py-2 cursor-default select-none capitalize transition-colors",
-                          { "bg-gray-50": focus },
-                        )
-                      }
-                    >
-                      {d.firstname} {d.lastname}
-                    </ComboboxOption>
-                  ))}
-                </ComboboxOptions>
-              </Combobox>
-            ) : (
-              <InfoValue className="capitalize">
-                {isReplacementShow
-                  ? editForm?.replacement?.replacementDriverId
-                    ? `${editForm.replacement.replacementDriverId.firstname} ${editForm.replacement.replacementDriverId.lastname}`
-                    : "N/A"
-                  : editForm?.driverId?._id
-                    ? `${editForm.driverId.firstname} ${editForm.driverId.lastname}`
-                    : "N/A"}
-              </InfoValue>
-            )}
-          </InfoField>
+          {/* Driver */}
+          <ComboboxField
+            label="Driver"
+            value={activeDriverId}
+            onChange={(v) =>
+              handleComboboxChange(
+                isReplacementShow
+                  ? "replacement.replacementDriverId"
+                  : "driverId",
+                v,
+              )
+            }
+            onQueryChange={
+              isReplacementShow ? setReplacementDriverQuery : setDriverQuery
+            }
+            allOptions={
+              drivers?.map((d) => ({
+                id: d._id,
+                label: `${d.firstname} ${d.lastname}`,
+              })) || []
+            }
+            options={(isReplacementShow
+              ? filteredReplacementDrivers
+              : filteredDrivers
+            ).map((d) => ({
+              id: d._id,
+              label: `${d.firstname} ${d.lastname}`,
+            }))}
+            disabled={!isEditMode}
+          />
 
           <div className="grid grid-cols-2 gap-4">
             <InputField
@@ -1603,10 +1470,9 @@ const DeploymentInfoTab = ({
               name="totalSacksCount"
               value={editForm?.totalSacksCount}
               disabled
-              formatNumber
-              thousandSeparator
+              required={false}
+              numeric
               decimalScale={0}
-              isRequired={false}
               onChange={handleChange}
             />
             <InputField
@@ -1620,16 +1486,16 @@ const DeploymentInfoTab = ({
                 ) || ""
               }
               disabled
-              formatNumber
-              thousandSeparator
+              required={false}
+              numeric
               decimalScale={2}
-              isRequired={false}
               onChange={handleChange}
             />
           </div>
         </div>
       </div>
 
+      {/* ── Delivery Details ── */}
       <div className="space-y-2">
         <h3 className="text-xxxs md:text-xxs font-semibold text-gray-600 uppercase tracking-wider">
           Delivery Details
@@ -1637,7 +1503,6 @@ const DeploymentInfoTab = ({
         <div className="grid grid-cols-1 xs:grid-cols-2 gap-x-4 gap-y-4 max-sm:gap-x-3 max-sm:gap-y-3 border border-gray-200 rounded-md p-5 max-sm:p-4">
           <InputField
             label="Receiving Contact Person"
-            type="text"
             name="receivingContactPerson"
             placeholder="Contact Person"
             value={editForm?.receivingContactPerson}
@@ -1646,7 +1511,6 @@ const DeploymentInfoTab = ({
           />
           <InputField
             label="Receiving Contact No."
-            type="text"
             name="receivingContactPersonNo"
             placeholder="Contact Number"
             value={editForm?.receivingContactPersonNo}
@@ -1655,127 +1519,43 @@ const DeploymentInfoTab = ({
             maxLength={11}
           />
 
-          <InfoField label="Destination">
-            {isEditMode ? (
-              <SelectWrapper
-                name="destination"
-                value={editForm?.destination}
-                onChange={handleChange}
-              >
-                {settings.deployments.destination.map((item, i) => (
-                  <option key={i} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </SelectWrapper>
-            ) : (
-              <InfoValue className="capitalize">
-                {editForm?.destination}
-              </InfoValue>
-            )}
-          </InfoField>
+          <SelectField
+            label="Destination"
+            name="destination"
+            value={editForm?.destination}
+            onChange={handleChange}
+            disabled={!isEditMode}
+          >
+            {settings.deployments.destination.map((item, i) => (
+              <option key={i} value={item}>
+                {item}
+              </option>
+            ))}
+          </SelectField>
 
           <div className="grid grid-cols-2 gap-4">
-            <InfoField label="Territory">
-              {isEditMode ? (
-                <SelectWrapper
-                  name="territory"
-                  value={editForm?.territory}
-                  onChange={handleChange}
-                >
-                  {settings.deployments.territory.map((item, i) => (
-                    <option key={i} value={item}>
-                      {item}
-                    </option>
-                  ))}
-                </SelectWrapper>
-              ) : (
-                <InfoValue className="capitalize">
-                  {editForm?.territory}
-                </InfoValue>
-              )}
-            </InfoField>
-            <InfoField label="Hybrid">
-              {isEditMode ? (
-                <SelectWrapper
-                  name="hybrid"
-                  value={editForm?.hybrid}
-                  onChange={handleChange}
-                >
-                  {settings.deployments.hybrid.map((item, i) => (
-                    <option key={i} value={item}>
-                      {item}
-                    </option>
-                  ))}
-                </SelectWrapper>
-              ) : (
-                <InfoValue className="capitalize">{editForm?.hybrid}</InfoValue>
-              )}
-            </InfoField>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <InfoField label="Flagging">
-              {isEditMode ? (
-                <SelectWrapper
-                  name="flagging"
-                  value={editForm?.flagging}
-                  onChange={handleChange}
-                >
-                  {settings.deployments.flagging.map((item, i) => (
-                    <option key={i} value={item}>
-                      {item}
-                    </option>
-                  ))}
-                </SelectWrapper>
-              ) : (
-                <InfoValue className="capitalize">
-                  {editForm?.flagging || "N/A"}
-                </InfoValue>
-              )}
-            </InfoField>
-            <InputField
-              label="Flagging Remarks"
-              type="text"
-              name="flaggingRemarks"
-              placeholder=""
-              maxLength={50}
-              value={editForm?.flaggingRemarks}
-              disabled={!isEditMode}
+            <SelectField
+              label="Status"
+              name="status"
+              value={editForm?.status}
               onChange={handleChange}
-              isRequired={false}
-            />
-          </div>
+              disabled={!isEditMode}
+            >
+              {DEPLOYMENT_STATUS.map((item, i) => (
+                <option key={i} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </SelectField>
 
-          <div className="grid grid-cols-2 gap-4">
-            <InfoField label="Status">
-              {isEditMode ? (
-                <SelectWrapper
-                  name="status"
-                  value={editForm?.status}
-                  onChange={handleChange}
-                >
-                  {DEPLOYMENT_STATUS.map((item, i) => (
-                    <option key={i} value={item.value}>
-                      {item.label}
-                    </option>
-                  ))}
-                </SelectWrapper>
-              ) : (
-                <InfoValue className="capitalize">{editForm?.status}</InfoValue>
-              )}
-            </InfoField>
             <InputField
               label="Cancellation Reason"
-              type="text"
               name="cancellationReason"
-              placeholder=""
               maxLength={50}
               value={editForm?.cancellationReason}
               disabled={!isEditMode || editForm?.status !== "canceled"}
               onChange={handleChange}
-              isRequired={false}
-              isCapitalize={false}
+              required={false}
             />
           </div>
         </div>
@@ -1800,11 +1580,6 @@ const PickupSitesTab = ({
   const lastStopRef = useRef(null);
   const prevLengthRef = useRef(pickups.length);
 
-  const dragIndexRef = useRef(null);
-  const dragOverIndexRef = useRef(null);
-  const [dragIndex, setDragIndex] = useState(null);
-  const [dragOverIndex, setDragOverIndex] = useState(null);
-
   useEffect(() => {
     if (pickups.length > prevLengthRef.current && lastStopRef.current) {
       lastStopRef.current.scrollIntoView({
@@ -1814,44 +1589,6 @@ const PickupSitesTab = ({
     }
     prevLengthRef.current = pickups.length;
   }, [pickups.length]);
-
-  const handleDragStart = (e, index) => {
-    dragIndexRef.current = index;
-    setDragIndex(index);
-    e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", String(index));
-  };
-
-  const handleDragEnter = (e, index) => {
-    e.preventDefault();
-    if (dragIndexRef.current === index) return;
-    dragOverIndexRef.current = index;
-    setDragOverIndex(index);
-  };
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-  };
-
-  const handleDrop = (e, index) => {
-    e.preventDefault();
-    const from = dragIndexRef.current;
-    if (from !== null && from !== index) {
-      reorderPickups(from, index);
-    }
-    dragIndexRef.current = null;
-    dragOverIndexRef.current = null;
-    setDragIndex(null);
-    setDragOverIndex(null);
-  };
-
-  const handleDragEnd = () => {
-    dragIndexRef.current = null;
-    dragOverIndexRef.current = null;
-    setDragIndex(null);
-    setDragOverIndex(null);
-  };
 
   const canReorder = isEditMode && pickups.length > 1;
 
@@ -1878,264 +1615,273 @@ const PickupSitesTab = ({
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto scrollbar-thin flex flex-col gap-3 min-h-0 px-6 max-sm:px-4 pb-4">
-        {pickups.map((pickup, index) => {
-          return (
-            <div
-              key={index}
-              ref={index === pickups.length - 1 ? lastStopRef : null}
-              className="border border-gray-200 rounded-md p-4 max-sm:p-3 bg-gray-50/50 relative"
-            >
-              <div className="flex items-center gap-2 mb-3">
-                <p className="text-xxs sm:text-xs font-semibold text-emerald-600 uppercase tracking-wide">
-                  Stop {index + 1} —{" "}
-                  <span className="font-mono">{pickup.tmoNo}</span>
-                </p>
-              </div>
-
-              {canReorder && (
-                <div className="flex shrink-0 absolute right-0 top-0 border-b border-l border-gray-200 rounded-bl-md overflow-hidden">
-                  <button
-                    type="button"
-                    onClick={() => reorderPickups(index, index - 1)}
-                    disabled={index === 0}
-                    className="py-2 px-2.5 text-gray-600 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
-                  >
-                    <TbArrowBigUpLine className="text-sm md:text-base" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => reorderPickups(index, index + 1)}
-                    disabled={index === pickups.length - 1}
-                    className="py-2 px-2.5 text-gray-600 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer border-l border-gray-200"
-                  >
-                    <TbArrowBigDownLine className="text-sm md:text-base" />
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => removePickupStop(index)}
-                    className="py-2 px-2.5 text-red-400 hover:text-red-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer border-l border-gray-200"
-                  >
-                    <FiTrash2 className="text-sm md:text-base" />
-                  </button>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-4 max-sm:gap-x-3 max-sm:gap-y-3">
-                {/* ── Pick-up Site: select in edit mode, InfoValue in view mode ── */}
-                <InfoField label="Pick-up Site">
-                  {isEditMode ? (
-                    <PickupSelectWrapper
-                      name="pickupSite"
-                      value={pickup.pickupSite}
-                      onChange={(e) => handlePickupChange(index, e)}
-                    >
-                      <option value="" disabled>
-                        Select
-                      </option>
-                      {(settings.deployments?.pickupSite || []).map(
-                        (item, i) => (
-                          <option key={i} value={item}>
-                            {item}
-                          </option>
-                        ),
-                      )}
-                    </PickupSelectWrapper>
-                  ) : (
-                    <InfoValue>{pickup.pickupSite}</InfoValue>
-                  )}
-                </InfoField>
-
-                {/* ── Municipality: select in edit mode, InfoValue in view mode ── */}
-                <InfoField label="Municipality">
-                  {isEditMode ? (
-                    <PickupSelectWrapper
-                      name="municipality"
-                      value={pickup.municipality}
-                      onChange={(e) => handlePickupChange(index, e)}
-                    >
-                      <option value="" disabled>
-                        Select
-                      </option>
-                      {(settings.deployments?.municipality || []).map(
-                        (item, i) => (
-                          <option key={i} value={item}>
-                            {item}
-                          </option>
-                        ),
-                      )}
-                    </PickupSelectWrapper>
-                  ) : (
-                    <InfoValue>{pickup.municipality}</InfoValue>
-                  )}
-                </InfoField>
-
-                {/* ── Scheduled Pickup Time ── */}
-                {isEditMode ? (
-                  <InputField
-                    label="Scheduled Pickup Time"
-                    type="datetime-local"
-                    name="scheduledPickupTime"
-                    value={pickup.scheduledPickupTime}
-                    onChange={(e) => handlePickupChange(index, e)}
-                    isCapitalize={false}
-                    isRequired={false}
-                  />
-                ) : (
-                  <InfoField label="Scheduled Pickup Time">
-                    {pickup.scheduledPickupTime ? (
-                      <InfoValue>
-                        {DateTime.fromISO(pickup.scheduledPickupTime)
-                          .setZone("Asia/Manila")
-                          .toFormat("MMM d, yyyy - hh:mm a")}
-                      </InfoValue>
-                    ) : (
-                      <div className="flex items-center bg-gray-50 border border-gray-200 rounded-md px-4 py-3 max-sm:px-3 max-sm:py-2.5">
-                        <p className="italic text-gray-400 text-xs max-sm:text-xxs">
-                          Not set
-                        </p>
-                      </div>
-                    )}
-                  </InfoField>
-                )}
-
-                {/* ── Field Contact Person: select in edit mode ── */}
-                <InfoField label="Field Contact Person">
-                  {isEditMode ? (
-                    <PickupSelectWrapper
-                      name="fieldContactPerson"
-                      value={pickup.fieldContactPerson}
-                      onChange={(e) => {
-                        handlePickupChange(index, e);
-                        // Auto-fill contact no from settings if available
-                        const persons =
-                          settings.deployments?.fieldContactPersons || [];
-                        const selected = persons.find(
-                          (p) => p.name === e.target.value,
-                        );
-                        if (selected) {
-                          handlePickupChange(index, {
-                            target: {
-                              name: "fieldContactPersonNo",
-                              value: selected.contactNo || "",
-                            },
-                          });
-                        }
-                      }}
-                    >
-                      <option value="" disabled>
-                        Select
-                      </option>
-                      {(settings.deployments?.fieldContactPersons || []).map(
-                        (person, i) => (
-                          <option key={i} value={person.name ?? person}>
-                            {person.name ?? person}
-                          </option>
-                        ),
-                      )}
-                    </PickupSelectWrapper>
-                  ) : (
-                    <InfoValue>{pickup.fieldContactPerson}</InfoValue>
-                  )}
-                </InfoField>
-
-                <InputField
-                  label="Field Contact No."
-                  type="text"
-                  name="fieldContactPersonNo"
-                  placeholder="Contact Number"
-                  value={pickup.fieldContactPersonNo}
-                  disabled={!isEditMode}
-                  onChange={(e) => handlePickupChange(index, e)}
-                  maxLength={11}
-                  isRequired={false}
-                />
-
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-xxxs md:text-xxs font-semibold text-gray-600 uppercase tracking-wider text-nowrap">
-                    Sacks Count
-                  </span>
-                  <div
-                    className={clsx(
-                      "flex items-center border rounded-md px-4 py-3 max-sm:px-3 max-sm:py-2.5 transition-all",
-                      !isEditMode
-                        ? "bg-gray-50 border-gray-200"
-                        : "bg-white border-gray-200 focus-within:border-gray-400",
-                    )}
-                  >
-                    <NumericFormat
-                      thousandSeparator={false}
-                      decimalScale={0}
-                      allowNegative={false}
-                      value={pickup.sacksCount}
-                      onValueChange={(v) =>
-                        handlePickupNumericChange(
-                          index,
-                          "sacksCount",
-                          v.floatValue,
-                        )
-                      }
-                      disabled={!isEditMode}
-                      className="flex-1 text-xs max-sm:text-xxs text-gray-800 placeholder-gray-400 bg-transparent focus:outline-none min-w-0"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 col-span-full gap-x-4 gap-y-4 max-sm:gap-x-3 max-sm:gap-y-3">
-                  {[
-                    {
-                      label: "Est. Wt (Kg)",
-                      field: "estimatedWeightKg",
-                      req: true,
-                    },
-                    {
-                      label: "Field Wt (Kg)",
-                      field: "fieldWeightKg",
-                      req: false,
-                    },
-                    {
-                      label: "Plant Wt (Kg)",
-                      field: "plantWeightKg",
-                      req: false,
-                    },
-                  ].map(({ label, field, req }) => (
-                    <div key={field} className="flex flex-col gap-1.5">
-                      <span className="text-xxxs md:text-xxs font-semibold text-gray-600 uppercase tracking-wider text-nowrap">
-                        {label}
-                      </span>
-                      <div
-                        className={clsx(
-                          "flex items-center border rounded-md px-4 py-3 max-sm:px-3 max-sm:py-2.5 transition-all",
-                          !isEditMode
-                            ? "bg-gray-50 border-gray-200"
-                            : "bg-white border-gray-200 focus-within:border-gray-400",
-                        )}
-                      >
-                        <NumericFormat
-                          thousandSeparator
-                          decimalScale={2}
-                          allowNegative={false}
-                          value={pickup[field]}
-                          onValueChange={(v) =>
-                            handlePickupNumericChange(
-                              index,
-                              field,
-                              v.floatValue,
-                            )
-                          }
-                          disabled={!isEditMode}
-                          required={req}
-                          className="flex-1 text-xs max-sm:text-xxs text-gray-800 placeholder-gray-400 bg-transparent focus:outline-none min-w-0"
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+      <div className="flex-1 overflow-y-auto scrollbar-thin flex flex-col gap-6 min-h-0 px-6 max-sm:px-4 pb-4">
+        {pickups.map((pickup, index) => (
+          <div
+            key={index}
+            ref={index === pickups.length - 1 ? lastStopRef : null}
+            className="border border-gray-200 rounded-md p-4 pb-6 max-sm:p-3 bg-gray-50/50 relative"
+          >
+            <div className="flex items-center gap-2 mb-3">
+              <p className="text-xxs sm:text-xs font-semibold text-emerald-600 uppercase tracking-wide">
+                Stop {index + 1} —{" "}
+                <span className="font-mono">{pickup.tmoNo}</span>
+              </p>
             </div>
-          );
-        })}
+
+            {canReorder && (
+              <div className="flex shrink-0 absolute right-0 top-0 border-b border-l border-gray-200 rounded-bl-md overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => reorderPickups(index, index - 1)}
+                  disabled={index === 0}
+                  className="py-2 px-2.5 text-gray-600 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                >
+                  <TbArrowBigUpLine className="text-sm md:text-base" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => reorderPickups(index, index + 1)}
+                  disabled={index === pickups.length - 1}
+                  className="py-2 px-2.5 text-gray-600 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer border-l border-gray-200"
+                >
+                  <TbArrowBigDownLine className="text-sm md:text-base" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => removePickupStop(index)}
+                  className="py-2 px-2.5 text-red-400 hover:text-red-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer border-l border-gray-200"
+                >
+                  <FiTrash2 className="text-sm md:text-base" />
+                </button>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-4 max-sm:gap-x-3 max-sm:gap-y-3">
+              <SelectField
+                label="Pick-up Site"
+                name="pickupSite"
+                value={pickup.pickupSite}
+                onChange={(e) => handlePickupChange(index, e)}
+                disabled={!isEditMode}
+              >
+                <option value="" disabled>
+                  Select
+                </option>
+                {(settings.deployments?.pickupSite || []).map((item, i) => (
+                  <option key={i} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </SelectField>
+
+              <SelectField
+                label="Municipality"
+                name="municipality"
+                value={pickup.municipality}
+                onChange={(e) => handlePickupChange(index, e)}
+                disabled={!isEditMode}
+              >
+                <option value="" disabled>
+                  Select
+                </option>
+                {(settings.deployments?.municipality || []).map((item, i) => (
+                  <option key={i} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </SelectField>
+
+              <InputField
+                label="Scheduled Pickup Time"
+                type="datetime-local"
+                name="scheduledPickupTime"
+                value={pickup.scheduledPickupTime}
+                onChange={(e) => handlePickupChange(index, e)}
+                disabled={!isEditMode}
+                required={false}
+              />
+
+              <InputField
+                label="Sacks Count"
+                type="number"
+                name="sacksCount"
+                value={pickup.sacksCount}
+                onChange={(e) =>
+                  handlePickupNumericChange(index, "sacksCount", e.target.value)
+                }
+                disabled={!isEditMode}
+                required={false}
+                numeric
+                thousandSep={false}
+                decimalScale={0}
+              />
+
+              <InputField
+                label="Field Wt (Kg)"
+                type="number"
+                name="fieldWeightKg"
+                value={pickup.fieldWeightKg}
+                onChange={(e) =>
+                  handlePickupNumericChange(
+                    index,
+                    "fieldWeightKg",
+                    e.target.value,
+                  )
+                }
+                disabled={!isEditMode}
+                required={false}
+                numeric
+                decimalScale={2}
+              />
+
+              <InputField
+                label="Plant Wt (Kg)"
+                type="number"
+                name="plantWeightKg"
+                value={pickup.plantWeightKg}
+                onChange={(e) =>
+                  handlePickupNumericChange(
+                    index,
+                    "plantWeightKg",
+                    e.target.value,
+                  )
+                }
+                disabled={!isEditMode}
+                required={false}
+                numeric
+                decimalScale={2}
+              />
+
+              <SelectField
+                label="Field Contact Person"
+                name="fieldContactPerson"
+                value={pickup.fieldContactPerson}
+                onChange={(e) => {
+                  handlePickupChange(index, e);
+                  const persons =
+                    settings.deployments?.fieldContactPersons || [];
+                  const selected = persons.find(
+                    (p) => p.name === e.target.value,
+                  );
+                  if (selected) {
+                    handlePickupChange(index, {
+                      target: {
+                        name: "fieldContactPersonNo",
+                        value: selected.contactNo || "",
+                      },
+                    });
+                  }
+                }}
+                disabled={!isEditMode}
+                required={false}
+              >
+                <option value="" disabled>
+                  Select
+                </option>
+                {(settings.deployments?.fieldContactPersons || []).map(
+                  (person, i) => (
+                    <option key={i} value={person.name ?? person}>
+                      {person.name ?? person}
+                    </option>
+                  ),
+                )}
+              </SelectField>
+
+              <InputField
+                label="Field Contact No."
+                name="fieldContactPersonNo"
+                placeholder="Contact Number"
+                value={pickup.fieldContactPersonNo}
+                disabled={!isEditMode}
+                onChange={(e) => handlePickupChange(index, e)}
+                maxLength={11}
+                required={false}
+              />
+
+              <InputField
+                label="Est. Wt (Kg)"
+                type="number"
+                name="estimatedWeightKg"
+                value={pickup.estimatedWeightKg}
+                onChange={(e) =>
+                  handlePickupNumericChange(
+                    index,
+                    "estimatedWeightKg",
+                    e.target.value,
+                  )
+                }
+                disabled={!isEditMode}
+                numeric
+                decimalScale={2}
+              />
+
+              <SelectField
+                label="Hybrid"
+                name="hybrid"
+                value={pickup.hybrid}
+                onChange={(e) => handlePickupChange(index, e)}
+                disabled={!isEditMode}
+                required={false}
+              >
+                <option value="" disabled>
+                  Select
+                </option>
+                {(settings.deployments?.hybrid || []).map((item, i) => (
+                  <option key={i} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </SelectField>
+
+              <SelectField
+                label="Territory"
+                name="territory"
+                value={pickup.territory}
+                onChange={(e) => handlePickupChange(index, e)}
+                disabled={!isEditMode}
+                required={false}
+              >
+                <option value="" disabled>
+                  Select
+                </option>
+                {(settings.deployments?.territory || []).map((item, i) => (
+                  <option key={i} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </SelectField>
+
+              <SelectField
+                label="Flagging"
+                name="flagging"
+                value={pickup.flagging}
+                onChange={(e) => handlePickupChange(index, e)}
+                disabled={!isEditMode}
+                required={false}
+              >
+                <option value="" disabled>
+                  Select
+                </option>
+                {(settings.deployments?.flagging || []).map((item, i) => (
+                  <option key={i} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </SelectField>
+
+              <InputField
+                label="Flagging Remarks"
+                name="flaggingRemarks"
+                maxLength={50}
+                value={pickup.flaggingRemarks}
+                disabled={!isEditMode}
+                onChange={(e) => handlePickupChange(index, e)}
+                required={false}
+              />
+            </div>
+          </div>
+        ))}
 
         {isEditMode && pickups.length >= MAX_PICKUPS && (
           <p className="text-xs text-gray-400 text-center mt-2">
@@ -2144,179 +1890,6 @@ const PickupSitesTab = ({
         )}
       </div>
     </div>
-  );
-};
-
-// ── SHARED UI HELPERS ──────────────────────────────────────────────────────────
-
-const InfoField = ({ label, children }) => (
-  <div className="flex flex-col gap-1.5">
-    <span className="text-xxxs md:text-xxs font-semibold text-gray-600 uppercase tracking-wider truncate">
-      {label}
-    </span>
-    {children}
-  </div>
-);
-
-const InfoValue = ({ children, className = "" }) => (
-  <div
-    className={clsx(
-      "flex items-center bg-gray-50 border border-gray-200 rounded-md px-4 py-3 max-sm:px-3 max-sm:py-2.5 text-xs max-sm:text-xxs text-gray-700 truncate capitalize",
-      className,
-    )}
-  >
-    {children || (
-      <span className="text-gray-400 italic text-xs max-sm:text-xxs">—</span>
-    )}
-  </div>
-);
-
-const SelectWrapper = ({ name, value, onChange, children }) => (
-  <div className="relative flex items-center bg-white border border-gray-200 rounded-md px-4 py-3 max-sm:px-3 max-sm:py-2.5 focus-within:border-gray-400 transition-all">
-    <select
-      name={name}
-      value={value}
-      onChange={onChange}
-      className="w-full h-full appearance-none bg-transparent text-xs max-sm:text-xxs text-gray-800 focus:outline-none capitalize"
-    >
-      {children}
-    </select>
-    <MdKeyboardArrowDown className="absolute right-4 max-sm:right-3 text-gray-400 text-base pointer-events-none" />
-  </div>
-);
-
-// ── Pickup-specific select wrapper (matches CreateDeploymentModal style) ──────
-const PickupSelectWrapper = ({ name, value, onChange, children }) => (
-  <div className="relative flex items-center bg-white border border-gray-200 rounded-md px-4 py-3 max-sm:px-3 max-sm:py-2.5 focus-within:border-gray-400 transition-all">
-    <select
-      name={name}
-      value={value || ""}
-      onChange={onChange}
-      className="w-full h-full appearance-none bg-transparent text-xs max-sm:text-xxs text-gray-800 focus:outline-none capitalize"
-    >
-      {children}
-    </select>
-    <MdKeyboardArrowDown className="absolute right-4 max-sm:right-3 text-gray-400 text-base pointer-events-none" />
-  </div>
-);
-
-const InputField = ({
-  colSpan = 1,
-  label,
-  type,
-  name,
-  placeholder = "",
-  value,
-  onChange,
-  disabled,
-  maxLength,
-  isRequired = true,
-  isCapitalize = true,
-  isUpperCase = false,
-  formatNumber = false,
-  thousandSeparator = true,
-  decimalScale = 0,
-  allowNegative = false,
-}) => {
-  const labelEl = (
-    <span className="text-xxxs md:text-xxs font-semibold text-gray-600 uppercase tracking-wider text-nowrap truncate">
-      {label} {isRequired && <span className="text-red-400">*</span>}
-    </span>
-  );
-  const wrapperClass = clsx(
-    "flex items-center border rounded-md px-4 py-3 max-sm:px-3 max-sm:py-2.5 transition-all duration-200",
-    disabled
-      ? "bg-gray-50 border-gray-200"
-      : "bg-white border-gray-200 focus-within:border-gray-400",
-  );
-  const inputClass = clsx(
-    "flex-1 min-w-0 text-xs max-sm:text-xxs placeholder-gray-400 bg-transparent focus:outline-none",
-    disabled ? "text-gray-500" : "text-gray-800",
-    {
-      capitalize: isCapitalize && type !== "datetime-local",
-      uppercase: isUpperCase,
-    },
-  );
-
-  if (formatNumber && type === "number") {
-    return (
-      <label className={`col-span-${colSpan} flex flex-col gap-1.5`}>
-        {labelEl}
-        <div className={wrapperClass}>
-          <NumericFormat
-            thousandSeparator={thousandSeparator}
-            decimalScale={decimalScale}
-            allowNegative={allowNegative}
-            value={value}
-            onValueChange={(v) =>
-              onChange({ target: { name, value: v.floatValue || "" } })
-            }
-            placeholder={placeholder}
-            disabled={disabled}
-            required={isRequired}
-            className={inputClass}
-          />
-        </div>
-      </label>
-    );
-  }
-
-  // ← add this block
-  if (type === "datetime-local") {
-    return (
-      <label className={`col-span-${colSpan} flex flex-col gap-1.5 `}>
-        {labelEl}
-        <div
-          className={clsx(
-            "flex items-center border rounded-md px-4 py-3 max-sm:px-2 max-sm:py-1 transition-all duration-200",
-            disabled
-              ? "bg-gray-50 border-gray-200"
-              : "bg-white border-gray-200 focus-within:border-gray-400",
-            "relative flex-1",
-          )}
-        >
-          <input
-            type="datetime-local"
-            name={name}
-            value={value || ""}
-            onChange={onChange}
-            disabled={disabled}
-            required={isRequired}
-            className={clsx(
-              inputClass,
-              "appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-inner-spin-button]:hidden [&::-webkit-clear-button]:hidden",
-            )}
-          />
-          <FaCalendar
-            onClick={() => !disabled && inputRef.current?.showPicker()}
-            className={clsx(
-              "absolute right-2.5 max-sm:text-xxs text-xs pointer-events-none",
-              disabled ? "text-gray-300" : "text-gray-400",
-            )}
-          />
-        </div>
-      </label>
-    );
-  }
-
-  return (
-    <label className={`col-span-${colSpan} flex flex-col gap-1.5`}>
-      {labelEl}
-      <div className={wrapperClass}>
-        <input
-          type={type}
-          name={name}
-          value={value || ""}
-          minLength={2}
-          maxLength={maxLength || 50}
-          onChange={onChange}
-          disabled={disabled}
-          required={isRequired}
-          placeholder={placeholder}
-          className={inputClass}
-        />
-      </div>
-    </label>
   );
 };
 

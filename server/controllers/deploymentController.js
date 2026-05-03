@@ -35,11 +35,13 @@ const mapPickup = (p) => ({
     p.sacksCount !== undefined && p.sacksCount !== ""
       ? Number(p.sacksCount)
       : 0,
+  hybrid: p.hybrid,
+  territory: p.territory,
+  flagging: p.flagging,
+  flaggingRemarks: p.flaggingRemarks || "",
 });
 
 // Helper: apply a date range filter.
-// isISO=false -> field is a native MongoDB Date (createdAt)
-// isISO=true  -> field is stored as an ISO string (departed, destDeparture)
 const applyDateRange = (query, field, from, to, isISO = false) => {
   if (from) {
     const [year, month, day] = from.split("-").map(Number);
@@ -81,10 +83,6 @@ const createDeployment = async (req, res, next) => {
       destination,
       receivingContactPerson,
       receivingContactPersonNo,
-      hybrid,
-      territory,
-      flagging,
-      flaggingRemarks,
       totalSacksCount,
       totalWeightKg,
       departed,
@@ -106,9 +104,6 @@ const createDeployment = async (req, res, next) => {
       destination,
       receivingContactPerson,
       receivingContactPersonNo,
-      hybrid,
-      territory,
-      flagging,
     });
 
     if (!pickups || !Array.isArray(pickups) || pickups.length === 0) {
@@ -124,6 +119,9 @@ const createDeployment = async (req, res, next) => {
         [`pickups[${i}].fieldContactPersonNo`]: p.fieldContactPersonNo,
         [`pickups[${i}].scheduledPickupTime`]: p.scheduledPickupTime,
         [`pickups[${i}].estimatedWeightKg`]: p.estimatedWeightKg,
+        [`pickups[${i}].hybrid`]: p.hybrid,
+        [`pickups[${i}].territory`]: p.territory,
+        [`pickups[${i}].flagging`]: p.flagging,
       });
     }
 
@@ -156,10 +154,6 @@ const createDeployment = async (req, res, next) => {
       destination,
       receivingContactPerson,
       receivingContactPersonNo,
-      hybrid,
-      territory,
-      flagging,
-      flaggingRemarks,
       totalSacksCount: totalSacksCount || 0,
       totalWeightKg: totalWeightKg || 0,
       departed: departed || "",
@@ -242,14 +236,10 @@ const getAllDeployments = async (req, res, next) => {
 
     if (includeDeleted !== "true")
       baseQuery = baseQuery.where("isSoftDeleted").ne(true);
-    if (territory && territory !== "")
-      baseQuery = baseQuery.where("territory").equals(territory);
     if (status && status !== "")
       baseQuery = baseQuery.where("status").equals(status);
 
-    baseQuery = applyStringFilter(baseQuery, "hybrid", hybrid);
-    baseQuery = applyStringFilter(baseQuery, "flagging", flagging);
-
+    // territory, hybrid, flagging are now per-pickup, so filter in-memory below
     baseQuery = applyDateRange(
       baseQuery,
       "createdAt",
@@ -306,6 +296,25 @@ const getAllDeployments = async (req, res, next) => {
       );
     }
 
+    // Filter by pickup-level fields (territory, hybrid, flagging)
+    if (territory && territory !== "") {
+      deployments = deployments.filter((d) =>
+        (d.pickups || []).some((p) => p.territory === territory),
+      );
+    }
+    if (hybrid && hybrid !== "") {
+      deployments = deployments.filter((d) =>
+        (d.pickups || []).some((p) => p.hybrid === hybrid),
+      );
+    }
+    if (flagging && flagging !== "") {
+      deployments = deployments.filter((d) =>
+        (d.pickups || []).some(
+          (p) => p.flagging?.toUpperCase() === flagging.toUpperCase(),
+        ),
+      );
+    }
+
     if (search && search !== "") {
       const s = search.toLowerCase();
       deployments = deployments.filter((deployment) => {
@@ -326,7 +335,15 @@ const getAllDeployments = async (req, res, next) => {
         ).toLowerCase();
 
         const matchesPickup = (deployment.pickups || []).some((p) =>
-          [p.tmoNo, p.pickupSite, p.municipality, p.fieldContactPerson]
+          [
+            p.tmoNo,
+            p.pickupSite,
+            p.municipality,
+            p.fieldContactPerson,
+            p.territory,
+            p.hybrid,
+            p.flagging,
+          ]
             .map((v) => (v || "").toLowerCase())
             .some((v) => v.includes(s)),
         );
@@ -339,7 +356,6 @@ const getAllDeployments = async (req, res, next) => {
           (deployment.truckType || "").toLowerCase().includes(s) ||
           (deployment.deploymentCode || "").toLowerCase().includes(s) ||
           getActiveSubcon(deployment).toLowerCase().includes(s) ||
-          (deployment.territory || "").toLowerCase().includes(s) ||
           matchesPickup
         );
       });
@@ -348,11 +364,7 @@ const getAllDeployments = async (req, res, next) => {
     const buildCountQuery = () => {
       let q = Deployment.find();
       if (includeDeleted !== "true") q = q.where("isSoftDeleted").ne(true);
-      if (territory && territory !== "")
-        q = q.where("territory").equals(territory);
       if (status && status !== "") q = q.where("status").equals(status);
-      q = applyStringFilter(q, "hybrid", hybrid);
-      q = applyStringFilter(q, "flagging", flagging);
       q = applyDateRange(q, "createdAt", assignedAtFrom, assignedAtTo, false);
       q = applyDateRange(q, "departed", departedAtFrom, departedAtTo, true);
       q = applyDateRange(
@@ -367,7 +379,13 @@ const getAllDeployments = async (req, res, next) => {
 
     let total;
 
-    if (subconFilter || (search && search !== "")) {
+    if (
+      subconFilter ||
+      (search && search !== "") ||
+      territory ||
+      hybrid ||
+      flagging
+    ) {
       const allForCount = await buildCountQuery().populate([
         { path: "truckId", select: "subcon plateNo" },
         { path: "replacement.replacementTruckId", select: "subcon plateNo" },
@@ -385,6 +403,24 @@ const getAllDeployments = async (req, res, next) => {
         );
       }
 
+      if (territory && territory !== "") {
+        filtered = filtered.filter((d) =>
+          (d.pickups || []).some((p) => p.territory === territory),
+        );
+      }
+      if (hybrid && hybrid !== "") {
+        filtered = filtered.filter((d) =>
+          (d.pickups || []).some((p) => p.hybrid === hybrid),
+        );
+      }
+      if (flagging && flagging !== "") {
+        filtered = filtered.filter((d) =>
+          (d.pickups || []).some(
+            (p) => p.flagging?.toUpperCase() === flagging.toUpperCase(),
+          ),
+        );
+      }
+
       if (search && search !== "") {
         const s = search.toLowerCase();
         filtered = filtered.filter((deployment) => {
@@ -395,7 +431,15 @@ const getAllDeployments = async (req, res, next) => {
           ).toLowerCase();
 
           const matchesPickup = (deployment.pickups || []).some((p) =>
-            [p.tmoNo, p.pickupSite, p.municipality, p.fieldContactPerson]
+            [
+              p.tmoNo,
+              p.pickupSite,
+              p.municipality,
+              p.fieldContactPerson,
+              p.territory,
+              p.hybrid,
+              p.flagging,
+            ]
               .map((v) => (v || "").toLowerCase())
               .some((v) => v.includes(s)),
           );
@@ -406,7 +450,6 @@ const getAllDeployments = async (req, res, next) => {
             (deployment.truckType || "").toLowerCase().includes(s) ||
             (deployment.deploymentCode || "").toLowerCase().includes(s) ||
             getActiveSubcon(deployment).toLowerCase().includes(s) ||
-            (deployment.territory || "").toLowerCase().includes(s) ||
             matchesPickup
           );
         });
@@ -443,10 +486,6 @@ const updateDeployment = async (req, res, next) => {
       destination,
       receivingContactPerson,
       receivingContactPersonNo,
-      hybrid,
-      territory,
-      flagging,
-      flaggingRemarks,
       totalSacksCount,
       totalWeightKg,
       replacement,
@@ -511,10 +550,6 @@ const updateDeployment = async (req, res, next) => {
       destination: existingDeployment.destination,
       receivingContactPerson: existingDeployment.receivingContactPerson,
       receivingContactPersonNo: existingDeployment.receivingContactPersonNo,
-      hybrid: existingDeployment.hybrid,
-      territory: existingDeployment.territory,
-      flagging: existingDeployment.flagging,
-      flaggingRemarks: existingDeployment.flaggingRemarks,
       totalSacksCount: existingDeployment.totalSacksCount,
       totalWeightKg: existingDeployment.totalWeightKg,
       departed: existingDeployment.departed,
@@ -927,6 +962,11 @@ const updateDeployment = async (req, res, next) => {
           stop.plantWeightKg = update.plantWeightKg;
         if (update.sacksCount !== undefined)
           stop.sacksCount = Number(update.sacksCount);
+        if (update.hybrid !== undefined) stop.hybrid = update.hybrid;
+        if (update.territory !== undefined) stop.territory = update.territory;
+        if (update.flagging !== undefined) stop.flagging = update.flagging;
+        if (update.flaggingRemarks !== undefined)
+          stop.flaggingRemarks = update.flaggingRemarks;
       }
       existingDeployment.markModified("pickups");
     }
@@ -977,14 +1017,6 @@ const updateDeployment = async (req, res, next) => {
         receivingContactPersonNo !== undefined
           ? receivingContactPersonNo
           : existingDeployment.receivingContactPersonNo,
-      hybrid: hybrid !== undefined ? hybrid : existingDeployment.hybrid,
-      territory:
-        territory !== undefined ? territory : existingDeployment.territory,
-      flagging: flagging !== undefined ? flagging : existingDeployment.flagging,
-      flaggingRemarks:
-        flaggingRemarks !== undefined
-          ? flaggingRemarks
-          : existingDeployment.flaggingRemarks,
       totalSacksCount: computedSacksCount,
       totalWeightKg: computedWeightKg,
       departed: departed !== undefined ? departed : existingDeployment.departed,
@@ -1063,7 +1095,6 @@ const updateDeployment = async (req, res, next) => {
     };
 
     // ── Pickup timeline logs ──────────────────────────────────────────────
-    // Stop label is only shown when there are 2 or more pickups
     if (pickups !== undefined && finalStatus !== "canceled") {
       const isMultiStop = pickups.length >= 2;
 
@@ -1109,6 +1140,32 @@ const updateDeployment = async (req, res, next) => {
           await createActivityLog(
             `Departed from pickup location${stopLabel ? ` (${stopLabel})` : ""}`,
           );
+        }
+
+        // Activity log for per-pickup field changes
+        if (originalStop) {
+          if (p.hybrid !== undefined && p.hybrid !== originalStop.hybrid)
+            await createActivityLog(
+              `Hybrid changed to ${p.hybrid}${stopLabel ? ` (${stopLabel})` : ""}`,
+            );
+          if (
+            p.territory !== undefined &&
+            p.territory !== originalStop.territory
+          )
+            await createActivityLog(
+              `Territory changed to ${p.territory}${stopLabel ? ` (${stopLabel})` : ""}`,
+            );
+          if (p.flagging !== undefined && p.flagging !== originalStop.flagging)
+            await createActivityLog(
+              `Flagging changed to ${p.flagging}${stopLabel ? ` (${stopLabel})` : ""}`,
+            );
+          if (
+            p.flaggingRemarks !== undefined &&
+            p.flaggingRemarks !== originalStop.flaggingRemarks
+          )
+            await createActivityLog(
+              `Flagging remarks updated${stopLabel ? ` (${stopLabel})` : ""}`,
+            );
         }
       }
     }
@@ -1164,6 +1221,36 @@ const updateDeployment = async (req, res, next) => {
             `Departed from pickup location${stopLabel ? ` (${stopLabel})` : ""}`,
           );
         }
+
+        // Activity log for per-pickup field changes via pickupUpdates
+        if (
+          update.hybrid !== undefined &&
+          update.hybrid !== originalStop?.hybrid
+        )
+          await createActivityLog(
+            `Hybrid changed to ${update.hybrid}${stopLabel ? ` (${stopLabel})` : ""}`,
+          );
+        if (
+          update.territory !== undefined &&
+          update.territory !== originalStop?.territory
+        )
+          await createActivityLog(
+            `Territory changed to ${update.territory}${stopLabel ? ` (${stopLabel})` : ""}`,
+          );
+        if (
+          update.flagging !== undefined &&
+          update.flagging !== originalStop?.flagging
+        )
+          await createActivityLog(
+            `Flagging changed to ${update.flagging}${stopLabel ? ` (${stopLabel})` : ""}`,
+          );
+        if (
+          update.flaggingRemarks !== undefined &&
+          update.flaggingRemarks !== originalStop?.flaggingRemarks
+        )
+          await createActivityLog(
+            `Flagging remarks updated${stopLabel ? ` (${stopLabel})` : ""}`,
+          );
       }
     }
 
@@ -1336,17 +1423,6 @@ const updateDeployment = async (req, res, next) => {
       await createActivityLog(`Load weight changed to ${computedWeightKg} kg`);
     if (finalStatus !== undefined && finalStatus !== originalStatus)
       await createActivityLog(`Status changed to ${finalStatus}`);
-    if (territory !== undefined && territory !== originalValues.territory)
-      await createActivityLog(`Territory changed to ${territory}`);
-    if (hybrid !== undefined && hybrid !== originalValues.hybrid)
-      await createActivityLog(`Hybrid changed to ${hybrid}`);
-    if (flagging !== undefined && flagging !== originalValues.flagging)
-      await createActivityLog(`Flagging changed to ${flagging}`);
-    if (
-      flaggingRemarks !== undefined &&
-      flaggingRemarks !== originalValues.flaggingRemarks
-    )
-      await createActivityLog(`Flagging remarks updated`);
 
     if (finalCancellationReason !== originalValues.cancellationReason) {
       if (finalStatus === "canceled" && finalCancellationReason)

@@ -5,29 +5,17 @@ import {
   DialogPanel,
   Transition,
   TransitionChild,
-  Combobox,
-  ComboboxInput,
-  ComboboxOption,
-  ComboboxOptions,
-  ComboboxButton,
 } from "@headlessui/react";
 import { IoClose } from "react-icons/io5";
-import { MdKeyboardArrowDown } from "react-icons/md";
 import { toast } from "react-toastify";
-import clsx from "clsx";
 import { PiMapPinAreaFill } from "react-icons/pi";
 import { FiPlus, FiTrash2 } from "react-icons/fi";
 import useCreateDeployment from "../../hooks/useCreateDeployment";
-import { NumericFormat } from "react-number-format";
 import { useSettingsContext } from "../../contexts/SettingsContext";
 import ActionButton from "../ui/ActionButton";
-import {
-  TbLocation,
-  TbPackage,
-  TbPackageExport,
-  TbPrinter,
-  TbTruckDelivery,
-} from "react-icons/tb";
+import InputField from "../ui/InputField";
+import SelectField from "../ui/SelectField";
+import ComboboxField from "../ui/ComboboxField";
 
 const defaultPickup = {
   pickupSite: "",
@@ -36,6 +24,10 @@ const defaultPickup = {
   fieldContactPersonNo: "",
   scheduledPickupTime: "",
   estimatedWeightKg: "",
+  hybrid: "",
+  territory: "",
+  flagging: "",
+  flaggingRemarks: "",
 };
 
 const defaultValue = {
@@ -47,10 +39,6 @@ const defaultValue = {
   destination: "",
   receivingContactPerson: "",
   receivingContactPersonNo: "",
-  hybrid: "",
-  territory: "",
-  flagging: "",
-  flaggingRemarks: "",
   totalSacksCount: 0,
   totalWeightKg: 0,
   departed: "",
@@ -75,23 +63,23 @@ function CreateDeploymentModal({ isOpen, onClose, onCreate, trucks, drivers }) {
   const receivingContactPersons =
     settings.deployments?.receivingContactPersons || [];
 
-  const truckOptions =
+  const truckAllOptions =
     trucks
       ?.filter((truck) => truck.status === "available")
       .sort((a, b) => (a.tripCount || 0) - (b.tripCount || 0))
       .map((truck) => ({
-        value: truck._id,
+        id: truck._id,
         label: `${truck.plateNo.toUpperCase()} (${truck.truckType}) — ${
           truck.tripCount || 0
         } trips`,
       })) || [];
 
-  const driverOptions =
+  const driverAllOptions =
     drivers
       ?.filter((driver) => driver.status === "available")
       .sort((a, b) => (a.tripCount || 0) - (b.tripCount || 0))
       .map((driver) => ({
-        value: driver._id,
+        id: driver._id,
         label: `${driver.firstname} ${driver.lastname} — ${
           driver.tripCount || 0
         } trips`,
@@ -99,22 +87,17 @@ function CreateDeploymentModal({ isOpen, onClose, onCreate, trucks, drivers }) {
 
   const filteredTrucks =
     truckQuery === ""
-      ? truckOptions
-      : truckOptions.filter((t) =>
+      ? truckAllOptions
+      : truckAllOptions.filter((t) =>
           t.label.toLowerCase().includes(truckQuery.toLowerCase()),
         );
 
   const filteredDrivers =
     driverQuery === ""
-      ? driverOptions
-      : driverOptions.filter((d) =>
+      ? driverAllOptions
+      : driverAllOptions.filter((d) =>
           d.label.toLowerCase().includes(driverQuery.toLowerCase()),
         );
-
-  const selectedTruck = truckOptions.find((t) => t.value === formData.truckId);
-  const selectedDriver = driverOptions.find(
-    (d) => d.value === formData.driverId,
-  );
 
   useEffect(() => {
     if (isOpen) {
@@ -123,7 +106,6 @@ function CreateDeploymentModal({ isOpen, onClose, onCreate, trucks, drivers }) {
     }
   }, [isOpen, settings.deployments.destination]);
 
-  // Scroll to new stop when added
   useEffect(() => {
     if (
       formData.pickups.length > prevLengthRef.current &&
@@ -226,7 +208,6 @@ function CreateDeploymentModal({ isOpen, onClose, onCreate, trucks, drivers }) {
   return (
     <Transition show={isOpen} as={React.Fragment}>
       <Dialog onClose={() => {}} className="relative z-50">
-        {/* ── Backdrop ── */}
         <TransitionChild
           as={React.Fragment}
           enter="ease-out duration-300"
@@ -240,7 +221,6 @@ function CreateDeploymentModal({ isOpen, onClose, onCreate, trucks, drivers }) {
         </TransitionChild>
 
         <div className="fixed inset-0 flex items-center justify-center p-4 max-sm:p-2">
-          {/* ── Slide-from-top transition ── */}
           <TransitionChild
             as={React.Fragment}
             enter="duration-500 ease-out"
@@ -329,116 +309,185 @@ function CreateDeploymentModal({ isOpen, onClose, onCreate, trucks, drivers }) {
                           </div>
 
                           <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-4 max-sm:gap-x-3 max-sm:gap-y-3">
-                            {/* Pick-up Site */}
-                            <FormField label="Pick-up Site">
-                              <FieldSelectWrapper
-                                name="pickupSite"
-                                value={pickup.pickupSite}
-                                onChange={(e) => handlePickupChange(index, e)}
-                              >
-                                <option value="" disabled>
-                                  Select
-                                </option>
-                                {(settings.deployments?.pickupSite || []).map(
-                                  (item, i) => (
-                                    <option key={i} value={item}>
-                                      {item}
-                                    </option>
-                                  ),
-                                )}
-                              </FieldSelectWrapper>
-                            </FormField>
+                            <SelectField
+                              label="Pick-up Site"
+                              name="pickupSite"
+                              value={pickup.pickupSite}
+                              onChange={(e) => handlePickupChange(index, e)}
+                              required={false}
+                            >
+                              <option value="" disabled>
+                                Select
+                              </option>
+                              {(settings.deployments?.pickupSite || []).map(
+                                (item, i) => (
+                                  <option key={i} value={item}>
+                                    {item}
+                                  </option>
+                                ),
+                              )}
+                            </SelectField>
 
-                            {/* Municipality */}
-                            <FormField label="Municipality">
-                              <FieldSelectWrapper
-                                name="municipality"
-                                value={pickup.municipality}
-                                onChange={(e) => handlePickupChange(index, e)}
-                              >
-                                <option value="" disabled>
-                                  Select
-                                </option>
-                                {(settings.deployments?.municipality || []).map(
-                                  (item, i) => (
-                                    <option key={i} value={item}>
-                                      {item}
-                                    </option>
-                                  ),
-                                )}
-                              </FieldSelectWrapper>
-                            </FormField>
+                            <SelectField
+                              label="Municipality"
+                              name="municipality"
+                              value={pickup.municipality}
+                              onChange={(e) => handlePickupChange(index, e)}
+                              required={false}
+                            >
+                              <option value="" disabled>
+                                Select
+                              </option>
+                              {(settings.deployments?.municipality || []).map(
+                                (item, i) => (
+                                  <option key={i} value={item}>
+                                    {item}
+                                  </option>
+                                ),
+                              )}
+                            </SelectField>
 
-                            {/* Scheduled Pickup Time */}
-                            <FieldInput
+                            <InputField
                               label="Scheduled Pickup Time"
                               type="datetime-local"
                               name="scheduledPickupTime"
                               value={pickup.scheduledPickupTime}
                               onChange={(e) => handlePickupChange(index, e)}
-                              isRequired={false}
+                              required={false}
                             />
 
-                            {/* Est. Weight */}
-                            <FormField label="Est. Weight (kg)" required>
-                              <div className="flex items-center bg-white border border-gray-200 rounded-md px-4 py-3 max-sm:px-3 max-sm:py-2.5 focus-within:border-gray-400 transition-colors">
-                                <NumericFormat
-                                  thousandSeparator
-                                  decimalScale={2}
-                                  allowNegative={false}
-                                  value={pickup.estimatedWeightKg}
-                                  onValueChange={(values) =>
-                                    handlePickupNumericChange(
-                                      index,
-                                      "estimatedWeightKg",
-                                      values.floatValue,
-                                    )
-                                  }
-                                  placeholder="0.00"
-                                  required
-                                  className="flex-1 text-xs max-sm:text-xxs text-gray-800 placeholder-gray-400 bg-transparent focus:outline-none"
-                                />
-                              </div>
-                            </FormField>
+                            <InputField
+                              label="Est. Weight (kg)"
+                              type="number"
+                              name="estimatedWeightKg"
+                              value={pickup.estimatedWeightKg}
+                              onChange={(e) =>
+                                handlePickupNumericChange(
+                                  index,
+                                  "estimatedWeightKg",
+                                  e.target.value,
+                                )
+                              }
+                              numeric
+                              decimalScale={2}
+                              placeholder="0.00"
+                            />
 
-                            {/* Field Contact Person */}
-                            <FormField label="Field Contact Person">
-                              <FieldSelectWrapper
-                                name="fieldContactPerson"
-                                value={pickup.fieldContactPerson}
-                                onChange={(e) => {
-                                  const selected = fieldContactPersons.find(
-                                    (p) => p.name === e.target.value,
-                                  );
-                                  handleFieldContactPersonChange(
-                                    index,
-                                    selected ? selected.name : "",
-                                    selected ? selected.contactNo || "" : "",
-                                  );
-                                }}
-                              >
-                                <option value="" disabled>
-                                  Select
+                            <SelectField
+                              label="Field Contact Person"
+                              name="fieldContactPerson"
+                              value={pickup.fieldContactPerson}
+                              onChange={(e) => {
+                                const selected = fieldContactPersons.find(
+                                  (p) => p.name === e.target.value,
+                                );
+                                handleFieldContactPersonChange(
+                                  index,
+                                  selected ? selected.name : "",
+                                  selected ? selected.contactNo || "" : "",
+                                );
+                              }}
+                              required={false}
+                            >
+                              <option value="" disabled>
+                                Select
+                              </option>
+                              {fieldContactPersons.map((person, i) => (
+                                <option key={i} value={person.name ?? person}>
+                                  {person.name ?? person}
                                 </option>
-                                {fieldContactPersons.map((person, i) => (
-                                  <option key={i} value={person.name ?? person}>
-                                    {person.name ?? person}
-                                  </option>
-                                ))}
-                              </FieldSelectWrapper>
-                            </FormField>
+                              ))}
+                            </SelectField>
 
-                            {/* Field Contact No */}
-                            <FieldInput
+                            <InputField
                               label="Field Contact No."
-                              type="text"
                               name="fieldContactPersonNo"
                               placeholder="Contact Number"
                               value={pickup.fieldContactPersonNo}
                               onChange={(e) => handlePickupChange(index, e)}
                               maxLength={11}
-                              isRequired={false}
+                              required={false}
                             />
+
+                            <SelectField
+                              label="Hybrid"
+                              name="hybrid"
+                              value={pickup.hybrid}
+                              onChange={(e) => handlePickupChange(index, e)}
+                            >
+                              <option value="" disabled>
+                                Select
+                              </option>
+                              {(settings.deployments?.hybrid || []).map(
+                                (item, i) => (
+                                  <option key={i} value={item}>
+                                    {item}
+                                  </option>
+                                ),
+                              )}
+                            </SelectField>
+
+                            <SelectField
+                              label="Territory"
+                              name="territory"
+                              value={pickup.territory}
+                              onChange={(e) => handlePickupChange(index, e)}
+                            >
+                              <option value="" disabled>
+                                Select
+                              </option>
+                              {(settings.deployments?.territory || []).map(
+                                (item, i) => (
+                                  <option key={i} value={item}>
+                                    {item}
+                                  </option>
+                                ),
+                              )}
+                            </SelectField>
+
+                            <SelectField
+                              label="Flagging"
+                              name="flagging"
+                              value={pickup.flagging}
+                              onChange={(e) => {
+                                handlePickupChange(index, e);
+                                if (e.target.value.toLowerCase() === "green") {
+                                  handlePickupChange(index, {
+                                    target: {
+                                      name: "flaggingRemarks",
+                                      value: "",
+                                    },
+                                  });
+                                }
+                              }}
+                            >
+                              <option value="" disabled>
+                                Select
+                              </option>
+                              {(settings.deployments?.flagging || []).map(
+                                (item, i) => (
+                                  <option key={i} value={item}>
+                                    {item}
+                                  </option>
+                                ),
+                              )}
+                            </SelectField>
+
+                            {pickup.flagging &&
+                              pickup.flagging.toLowerCase() !== "green" && (
+                                <div className="md:col-span-3">
+                                  <InputField
+                                    label="Flagging Remarks"
+                                    name="flaggingRemarks"
+                                    maxLength={50}
+                                    value={pickup.flaggingRemarks}
+                                    onChange={(e) =>
+                                      handlePickupChange(index, e)
+                                    }
+                                    required={false}
+                                  />
+                                </div>
+                              )}
                           </div>
                         </div>
                       ))}
@@ -454,265 +503,97 @@ function CreateDeploymentModal({ isOpen, onClose, onCreate, trucks, drivers }) {
                   {/* ── TRUCK & DRIVER DETAILS ── */}
                   <div className="space-y-2">
                     <h3 className="text-xxxs md:text-xxs font-semibold text-gray-600 uppercase tracking-wider">
-                      Truck & Driver Details
+                      Truck & Other Details
                     </h3>
                     <div className="grid grid-cols-1 xs:grid-cols-2 gap-x-4 gap-y-4 max-sm:gap-x-3 max-sm:gap-y-3 border border-gray-200 rounded-md p-5 max-sm:p-4">
-                      {/* Truck Combobox */}
-                      <FormField label="Select Truck" required>
-                        <Combobox
-                          value={formData.truckId}
-                          onChange={(v) => {
-                            setFormData((prev) => ({ ...prev, truckId: v }));
-                            setTruckQuery("");
-                          }}
-                        >
-                          <div className="relative flex items-center bg-white border border-gray-200 rounded-md px-4 py-3 max-sm:px-3 max-sm:py-2.5 focus-within:border-gray-400 transition-colors">
-                            <ComboboxInput
-                              className="w-full bg-transparent text-xs max-sm:text-xxs text-gray-800 placeholder-gray-400 focus:outline-none uppercase min-w-0"
-                              displayValue={() => selectedTruck?.label || ""}
-                              onChange={(e) => setTruckQuery(e.target.value)}
-                              onFocus={() => setTruckQuery("")}
-                              placeholder="Search plate no."
-                              required
-                              autoComplete="off"
-                            />
-                            <ComboboxButton
-                              onClick={() => setTruckQuery("")}
-                              className="absolute right-4 max-sm:right-3 text-gray-400"
-                            >
-                              <MdKeyboardArrowDown className="text-base" />
-                            </ComboboxButton>
-                          </div>
-                          <ComboboxOptions
-                            portal
-                            anchor={{ to: "bottom start", gap: 8 }}
-                            className="z-999 max-h-60 w-(--input-width) overflow-auto rounded-md bg-white border border-gray-200 py-1 text-xs focus:outline-none"
-                          >
-                            {filteredTrucks.length === 0 ? (
-                              <div className="px-4 py-2 text-gray-400 italic">
-                                Nothing found.
-                              </div>
-                            ) : (
-                              filteredTrucks.map((t) => (
-                                <ComboboxOption
-                                  key={t.value}
-                                  value={t.value}
-                                  className={({ focus }) =>
-                                    clsx(
-                                      "px-4 py-2 cursor-default select-none uppercase transition-colors",
-                                      { "bg-gray-50": focus },
-                                    )
-                                  }
-                                >
-                                  {t.label}
-                                </ComboboxOption>
-                              ))
-                            )}
-                          </ComboboxOptions>
-                        </Combobox>
-                      </FormField>
+                      <ComboboxField
+                        label="Select Truck"
+                        value={formData.truckId}
+                        onChange={(v) =>
+                          setFormData((prev) => ({ ...prev, truckId: v }))
+                        }
+                        onQueryChange={setTruckQuery}
+                        allOptions={truckAllOptions}
+                        options={filteredTrucks}
+                        uppercase
+                      />
 
-                      {/* Driver Combobox */}
-                      <FormField label="Select Driver" required>
-                        <Combobox
-                          value={formData.driverId}
-                          onChange={(v) => {
-                            setFormData((prev) => ({ ...prev, driverId: v }));
-                            setDriverQuery("");
-                          }}
-                        >
-                          <div className="relative flex items-center bg-white border border-gray-200 rounded-md px-4 py-3 max-sm:px-3 max-sm:py-2.5 focus-within:border-gray-400 transition-colors">
-                            <ComboboxInput
-                              className="w-full bg-transparent text-xs max-sm:text-xxs text-gray-800 placeholder-gray-400 focus:outline-none capitalize min-w-0"
-                              displayValue={() => selectedDriver?.label || ""}
-                              onChange={(e) => setDriverQuery(e.target.value)}
-                              onFocus={() => setDriverQuery("")}
-                              placeholder="Search driver name"
-                              required
-                              autoComplete="off"
-                            />
-                            <ComboboxButton
-                              onClick={() => setDriverQuery("")}
-                              className="absolute right-4 max-sm:right-3 text-gray-400"
-                            >
-                              <MdKeyboardArrowDown className="text-base" />
-                            </ComboboxButton>
-                          </div>
-                          <ComboboxOptions
-                            portal
-                            anchor={{ to: "bottom start", gap: 8 }}
-                            className="z-999 max-h-60 w-(--input-width) overflow-auto rounded-md bg-white border border-gray-200 py-1 text-xs focus:outline-none"
-                          >
-                            {filteredDrivers.length === 0 ? (
-                              <div className="px-4 py-2 text-gray-400 italic">
-                                Nothing found.
-                              </div>
-                            ) : (
-                              filteredDrivers.map((d) => (
-                                <ComboboxOption
-                                  key={d.value}
-                                  value={d.value}
-                                  className={({ focus }) =>
-                                    clsx(
-                                      "px-4 py-2 cursor-default select-none capitalize transition-colors",
-                                      { "bg-gray-50": focus },
-                                    )
-                                  }
-                                >
-                                  {d.label}
-                                </ComboboxOption>
-                              ))
-                            )}
-                          </ComboboxOptions>
-                        </Combobox>
-                      </FormField>
+                      <ComboboxField
+                        label="Select Driver"
+                        value={formData.driverId}
+                        onChange={(v) =>
+                          setFormData((prev) => ({ ...prev, driverId: v }))
+                        }
+                        onQueryChange={setDriverQuery}
+                        allOptions={driverAllOptions}
+                        options={filteredDrivers}
+                      />
 
-                      {/* Truck Type */}
-                      <FormField label="Truck Type" required>
-                        <FieldSelectWrapper
-                          name="truckType"
-                          value={formData.truckType}
-                          onChange={handleChange}
-                        >
-                          <option value="" disabled>
-                            Select
+                      <SelectField
+                        label="Truck Type"
+                        name="truckType"
+                        value={formData.truckType}
+                        onChange={handleChange}
+                      >
+                        <option value="" disabled>
+                          Select
+                        </option>
+                        {settings.trucksDrivers.truckType.map((item, i) => (
+                          <option key={i} value={item}>
+                            {item}
                           </option>
-                          {settings.trucksDrivers.truckType.map((item, i) => (
-                            <option key={i} value={item}>
-                              {item}
-                            </option>
-                          ))}
-                        </FieldSelectWrapper>
-                      </FormField>
+                        ))}
+                      </SelectField>
 
-                      {/* Helper Count */}
-                      <FieldInput
+                      <InputField
                         label="Helper Count"
                         type="number"
                         name="helperCount"
                         placeholder="0"
                         value={formData.helperCount}
                         onChange={handleChange}
-                        formatNumber
+                        numeric
+                        decimalScale={0}
                       />
-                    </div>
-                  </div>
 
-                  {/* ── DELIVERY DETAILS ── */}
-                  <div className="space-y-2">
-                    <h3 className="text-xxxs md:text-xxs font-semibold text-gray-600 uppercase tracking-wider">
-                      Delivery Details
-                    </h3>
-                    <div className="grid grid-cols-1 xs:grid-cols-2 gap-x-4 gap-y-4 max-sm:gap-x-3 max-sm:gap-y-3 border border-gray-200 rounded-md p-5 max-sm:p-4">
-                      {/* Receiving Contact Person */}
-                      <FormField label="Receiving Contact Person" required>
-                        <FieldSelectWrapper
-                          name="receivingContactPerson"
-                          value={formData.receivingContactPerson}
-                          onChange={(e) => {
-                            const selected = receivingContactPersons.find(
-                              (p) => p.name === e.target.value,
-                            );
-                            handleReceivingContactPersonChange(
-                              selected ? selected.name : "",
-                              selected ? selected.contactNo || "" : "",
-                            );
-                          }}
-                        >
-                          <option value="" disabled>
-                            Select
+                      <SelectField
+                        label="Receiving Contact Person"
+                        name="receivingContactPerson"
+                        value={formData.receivingContactPerson}
+                        onChange={(e) => {
+                          const selected = receivingContactPersons.find(
+                            (p) => p.name === e.target.value,
+                          );
+                          handleReceivingContactPersonChange(
+                            selected ? selected.name : "",
+                            selected ? selected.contactNo || "" : "",
+                          );
+                        }}
+                      >
+                        <option value="" disabled>
+                          Select
+                        </option>
+                        {receivingContactPersons.map((person, i) => (
+                          <option key={i} value={person.name}>
+                            {person.name}
                           </option>
-                          {receivingContactPersons.map((person, i) => (
-                            <option key={i} value={person.name}>
-                              {person.name}
-                            </option>
-                          ))}
-                        </FieldSelectWrapper>
-                      </FormField>
+                        ))}
+                      </SelectField>
 
-                      {/* Receiving Contact No */}
-                      <FieldInput
+                      <InputField
                         label="Receiving Contact No."
-                        type="text"
                         name="receivingContactPersonNo"
                         placeholder="Contact Number"
                         value={formData.receivingContactPersonNo}
                         onChange={handleChange}
                         maxLength={11}
-                        isRequired={false}
+                        required={false}
                       />
 
-                      {/* Hidden destination */}
                       <input
                         type="hidden"
                         name="destination"
                         value={formData.destination}
-                      />
-
-                      {/* Hybrid */}
-                      <FormField label="Hybrid" required>
-                        <FieldSelectWrapper
-                          name="hybrid"
-                          value={formData.hybrid}
-                          onChange={handleChange}
-                        >
-                          <option value="" disabled>
-                            Select
-                          </option>
-                          {settings.deployments.hybrid.map((item, i) => (
-                            <option key={i} value={item}>
-                              {item}
-                            </option>
-                          ))}
-                        </FieldSelectWrapper>
-                      </FormField>
-
-                      {/* Territory */}
-                      <FormField label="Territory" required>
-                        <FieldSelectWrapper
-                          name="territory"
-                          value={formData.territory}
-                          onChange={handleChange}
-                        >
-                          <option value="" disabled>
-                            Select
-                          </option>
-                          {settings.deployments.territory.map((item, i) => (
-                            <option key={i} value={item}>
-                              {item}
-                            </option>
-                          ))}
-                        </FieldSelectWrapper>
-                      </FormField>
-
-                      {/* Flagging */}
-                      <FormField label="Flagging" required>
-                        <FieldSelectWrapper
-                          name="flagging"
-                          value={formData.flagging}
-                          onChange={handleChange}
-                        >
-                          <option value="" disabled>
-                            Select
-                          </option>
-                          {settings.deployments.flagging.map((item, i) => (
-                            <option key={i} value={item}>
-                              {item}
-                            </option>
-                          ))}
-                        </FieldSelectWrapper>
-                      </FormField>
-
-                      {/* Flagging Remarks */}
-                      <FieldInput
-                        label="Flagging Remarks"
-                        type="text"
-                        name="flaggingRemarks"
-                        placeholder=""
-                        maxLength={50}
-                        value={formData.flaggingRemarks}
-                        onChange={handleChange}
-                        isRequired={false}
                       />
                     </div>
                   </div>
@@ -737,109 +618,5 @@ function CreateDeploymentModal({ isOpen, onClose, onCreate, trucks, drivers }) {
     </Transition>
   );
 }
-
-// ── SHARED UI HELPERS ──────────────────────────────────────────────────────────
-
-const FormField = ({ label, required = false, children }) => (
-  <div className="flex flex-col gap-1.5">
-    <span className="text-xxxs md:text-xxs font-semibold text-gray-600 uppercase tracking-wider truncate">
-      {label} {required && <span className="text-red-400">*</span>}
-    </span>
-    {children}
-  </div>
-);
-
-const FieldSelectWrapper = ({ name, value, onChange, children }) => (
-  <div className="relative flex items-center bg-white border border-gray-200 rounded-md px-4 py-3 max-sm:px-3 max-sm:py-2.5 focus-within:border-gray-400 transition-colors">
-    <select
-      name={name}
-      value={value || ""}
-      onChange={onChange}
-      className="w-full h-full appearance-none bg-transparent text-xs max-sm:text-xxs text-gray-800 focus:outline-none capitalize"
-    >
-      {children}
-    </select>
-    <MdKeyboardArrowDown className="absolute right-4 max-sm:right-3 text-gray-400 text-base pointer-events-none" />
-  </div>
-);
-
-const FieldInput = ({
-  label,
-  type,
-  name,
-  placeholder = "",
-  value,
-  onChange,
-  disabled,
-  maxLength,
-  isRequired = true,
-  isCapitalize = true,
-  formatNumber = false,
-  thousandSeparator = true,
-  decimalScale = 0,
-  allowNegative = false,
-}) => {
-  const labelEl = (
-    <span className="text-xxxs md:text-xxs font-semibold text-gray-600 uppercase tracking-wider text-nowrap truncate">
-      {label} {isRequired && <span className="text-red-400">*</span>}
-    </span>
-  );
-
-  const wrapperClass = clsx(
-    "flex items-center border rounded-md px-4 py-3 max-sm:px-3 max-sm:py-2.5 transition-colors",
-    disabled
-      ? "bg-gray-50 border-gray-200"
-      : "bg-white border-gray-200 focus-within:border-gray-400",
-  );
-
-  const inputClass = clsx(
-    "flex-1 min-w-0 text-xs max-sm:text-xxs placeholder-gray-400 bg-transparent focus:outline-none",
-    disabled ? "text-gray-500" : "text-gray-800",
-    { capitalize: isCapitalize && type !== "datetime-local" },
-  );
-
-  if (formatNumber && type === "number") {
-    return (
-      <div className="flex flex-col gap-1.5">
-        {labelEl}
-        <div className={wrapperClass}>
-          <NumericFormat
-            thousandSeparator={thousandSeparator}
-            decimalScale={decimalScale}
-            allowNegative={allowNegative}
-            value={value}
-            onValueChange={(v) =>
-              onChange({ target: { name, value: v.floatValue || "" } })
-            }
-            placeholder={placeholder}
-            disabled={disabled}
-            required={isRequired}
-            className={inputClass}
-          />
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col gap-1.5">
-      {labelEl}
-      <div className={wrapperClass}>
-        <input
-          type={type}
-          name={name}
-          value={value || ""}
-          minLength={2}
-          maxLength={maxLength || 50}
-          onChange={onChange}
-          disabled={disabled}
-          required={isRequired}
-          placeholder={placeholder}
-          className={inputClass}
-        />
-      </div>
-    </div>
-  );
-};
 
 export default CreateDeploymentModal;
