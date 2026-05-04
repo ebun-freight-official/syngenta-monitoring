@@ -12,7 +12,7 @@ const SelectField = ({
 }) => (
   <div className="flex flex-col gap-1.5">
     <span className="text-xxxs md:text-xxs font-semibold text-gray-600 uppercase tracking-wider truncate">
-      {label} {required && <span className="text-red-400">*</span>}
+      {label} {required && !disabled && <span className="text-red-400">*</span>}
     </span>
     <div
       className={clsx(

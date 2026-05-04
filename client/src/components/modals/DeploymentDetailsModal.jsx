@@ -13,7 +13,10 @@ import {
 import clsx from "clsx";
 import { IoClose } from "react-icons/io5";
 import { DEPLOYMENT_STATUS } from "../../utils/generalOptions";
-import { MdKeyboardArrowDown } from "react-icons/md";
+import {
+  MdKeyboardArrowDown,
+  MdOutlineKeyboardArrowDown,
+} from "react-icons/md";
 import { useEffect, useState } from "react";
 import { DateTime } from "luxon";
 import useUpdateDeployment from "../../hooks/useUpdateDeployment";
@@ -36,13 +39,14 @@ import {
 } from "react-icons/ri";
 import { FiPlus, FiTrash2 } from "react-icons/fi";
 import { useRef } from "react";
-import { FaCalendar } from "react-icons/fa";
+import { FaAngleDown, FaCalendar } from "react-icons/fa";
 import { exportTMOToPDF } from "../../utils/exportTMOToPDF";
 import ActionButton from "../ui/ActionButton";
 import InputField from "../ui/InputField";
 import SelectField from "../ui/SelectField";
 import React from "react";
 import ComboboxField from "../ui/ComboboxField";
+import { HiOutlineChevronDown } from "react-icons/hi";
 
 const MAX_PICKUPS = 10;
 
@@ -320,8 +324,8 @@ function DeploymentDetailsModal({
               className={clsx(
                 "font-poppins text-gray-900 w-full max-w-6xl rounded-xl bg-white shadow-lg overflow-hidden flex flex-col lg:flex-row",
                 ["head_admin", "admin"].includes(userData.data.role)
-                  ? "h-[80vh]"
-                  : "h-[72vh]",
+                  ? "h-[80vh] xs:h-[64vh] sm:h-[69vh] md:h-[72vh]"
+                  : "h-[80vh] xs:h-[56vh] sm:h-[62.5vh] md:h-[65.5vh]",
               )}
             >
               {/* ══ LEFT PANEL ══════════════════════════════════════════════════ */}
@@ -1536,29 +1540,35 @@ const DeploymentInfoTab = ({
           </SelectField>
 
           <div className="grid grid-cols-2 gap-4">
-            <SelectField
-              label="Status"
-              name="status"
-              value={editForm?.status}
-              onChange={handleChange}
-              disabled={!isEditMode}
+            <div
+              className={editForm?.status !== "canceled" ? "col-span-2" : ""}
             >
-              {DEPLOYMENT_STATUS.map((item, i) => (
-                <option key={i} value={item.value}>
-                  {item.label}
-                </option>
-              ))}
-            </SelectField>
+              <SelectField
+                label="Status"
+                name="status"
+                value={editForm?.status}
+                onChange={handleChange}
+                disabled={!isEditMode}
+              >
+                {DEPLOYMENT_STATUS.map((item, i) => (
+                  <option key={i} value={item.value}>
+                    {item.label}
+                  </option>
+                ))}
+              </SelectField>
+            </div>
 
-            <InputField
-              label="Cancellation Reason"
-              name="cancellationReason"
-              maxLength={50}
-              value={editForm?.cancellationReason}
-              disabled={!isEditMode || editForm?.status !== "canceled"}
-              onChange={handleChange}
-              required={false}
-            />
+            {editForm?.status === "canceled" && (
+              <InputField
+                label="Cancellation Reason"
+                name="cancellationReason"
+                maxLength={50}
+                value={editForm?.cancellationReason}
+                disabled={!isEditMode}
+                onChange={handleChange}
+                required={false}
+              />
+            )}
           </div>
         </div>
       </div>
@@ -1578,9 +1588,21 @@ const PickupSitesTab = ({
   reorderPickups,
 }) => {
   const { settings } = useSettingsContext();
+  const { userData } = useUserContext();
+  const isAdmin = ["head_admin", "admin"].includes(userData?.data?.role);
   const pickups = editForm?.pickups || [];
   const lastStopRef = useRef(null);
   const prevLengthRef = useRef(pickups.length);
+
+  const [collapsedStops, setCollapsedStops] = useState(() =>
+    Object.fromEntries(
+      (editForm?.pickups || []).map((_, i) => [i, isAdmin ? true : false]),
+    ),
+  );
+
+  const toggleCollapse = (index) => {
+    setCollapsedStops((prev) => ({ ...prev, [index]: !(prev[index] ?? true) }));
+  };
 
   useEffect(() => {
     if (pickups.length > prevLengthRef.current && lastStopRef.current) {
@@ -1676,7 +1698,6 @@ const PickupSitesTab = ({
                   </option>
                 ))}
               </SelectField>
-
               <SelectField
                 label="Municipality"
                 name="municipality"
@@ -1693,7 +1714,6 @@ const PickupSitesTab = ({
                   </option>
                 ))}
               </SelectField>
-
               <div className="max-md:hidden">
                 <InputField
                   label="Scheduled Pickup Time"
@@ -1705,7 +1725,6 @@ const PickupSitesTab = ({
                   required={false}
                 />
               </div>
-
               <div className="col-span-full grid grid-cols-3 gap-x-4 gap-y-4 max-sm:gap-x-3 max-sm:gap-y-3">
                 <InputField
                   label="Sacks Count"
@@ -1762,151 +1781,184 @@ const PickupSitesTab = ({
                   decimalScale={2}
                 />
               </div>
-
               {/* to hide */}
-              <div className="col-span-full grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-4 max-sm:gap-x-3 max-sm:gap-y-3">
-                <SelectField
-                  label="Field Contact Person"
-                  name="fieldContactPerson"
-                  value={pickup.fieldContactPerson}
-                  onChange={(e) => {
-                    handlePickupChange(index, e);
-                    const persons =
-                      settings.deployments?.fieldContactPersons || [];
-                    const selected = persons.find(
-                      (p) => p.name === e.target.value,
-                    );
-                    if (selected) {
-                      handlePickupChange(index, {
-                        target: {
-                          name: "fieldContactPersonNo",
-                          value: selected.contactNo || "",
-                        },
-                      });
-                    }
-                  }}
-                  disabled={!isEditMode}
-                  required={false}
-                >
-                  <option value="" disabled>
-                    Select
-                  </option>
-                  {(settings.deployments?.fieldContactPersons || []).map(
-                    (person, i) => (
-                      <option key={i} value={person.name ?? person}>
-                        {person.name ?? person}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateRows:
+                    (collapsedStops[index] ?? true) ? "0fr" : "1fr",
+                  transition: "grid-template-rows 0.3s ease",
+                }}
+                className="col-span-full"
+              >
+                <div className="overflow-hidden">
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-4 max-sm:gap-x-3 max-sm:gap-y-3">
+                    <SelectField
+                      label="Field Contact Person"
+                      name="fieldContactPerson"
+                      value={pickup.fieldContactPerson}
+                      onChange={(e) => {
+                        handlePickupChange(index, e);
+                        const persons =
+                          settings.deployments?.fieldContactPersons || [];
+                        const selected = persons.find(
+                          (p) => p.name === e.target.value,
+                        );
+                        if (selected) {
+                          handlePickupChange(index, {
+                            target: {
+                              name: "fieldContactPersonNo",
+                              value: selected.contactNo || "",
+                            },
+                          });
+                        }
+                      }}
+                      disabled={!isEditMode}
+                      required={false}
+                    >
+                      <option value="" disabled>
+                        Select
                       </option>
-                    ),
-                  )}
-                </SelectField>
+                      {(settings.deployments?.fieldContactPersons || []).map(
+                        (person, i) => (
+                          <option key={i} value={person.name ?? person}>
+                            {person.name ?? person}
+                          </option>
+                        ),
+                      )}
+                    </SelectField>
 
-                <InputField
-                  label="Field Contact No."
-                  name="fieldContactPersonNo"
-                  placeholder="Contact Number"
-                  value={pickup.fieldContactPersonNo}
-                  disabled={!isEditMode}
-                  onChange={(e) => handlePickupChange(index, e)}
-                  maxLength={11}
-                  required={false}
-                />
+                    <InputField
+                      label="Field Contact No."
+                      name="fieldContactPersonNo"
+                      placeholder="Contact Number"
+                      value={pickup.fieldContactPersonNo}
+                      disabled={!isEditMode}
+                      onChange={(e) => handlePickupChange(index, e)}
+                      maxLength={11}
+                      required={false}
+                    />
 
-                <InputField
-                  label="Est. Wt (Kg)"
-                  type="number"
-                  name="estimatedWeightKg"
-                  value={pickup.estimatedWeightKg}
-                  onChange={(e) =>
-                    handlePickupNumericChange(
-                      index,
-                      "estimatedWeightKg",
-                      e.target.value,
-                    )
-                  }
-                  disabled={!isEditMode}
-                  numeric
-                  decimalScale={2}
-                />
+                    <InputField
+                      label="Est. Wt (Kg)"
+                      type="number"
+                      name="estimatedWeightKg"
+                      value={pickup.estimatedWeightKg}
+                      onChange={(e) =>
+                        handlePickupNumericChange(
+                          index,
+                          "estimatedWeightKg",
+                          e.target.value,
+                        )
+                      }
+                      disabled={!isEditMode}
+                      numeric
+                      decimalScale={2}
+                    />
 
-                <div className="md:hidden">
-                  <InputField
-                    label="Scheduled Pickup Time"
-                    type="datetime-local"
-                    name="scheduledPickupTime"
-                    value={pickup.scheduledPickupTime}
-                    onChange={(e) => handlePickupChange(index, e)}
-                    disabled={!isEditMode}
-                    required={false}
-                  />
-                </div>
+                    <div className="md:hidden">
+                      <InputField
+                        label="Scheduled Pickup Time"
+                        type="datetime-local"
+                        name="scheduledPickupTime"
+                        value={pickup.scheduledPickupTime}
+                        onChange={(e) => handlePickupChange(index, e)}
+                        disabled={!isEditMode}
+                        required={false}
+                      />
+                    </div>
 
-                <div className="col-span-full grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-4 max-sm:gap-x-3 max-sm:gap-y-3 ">
-                  <SelectField
-                    label="Hybrid"
-                    name="hybrid"
-                    value={pickup.hybrid}
-                    onChange={(e) => handlePickupChange(index, e)}
-                    disabled={!isEditMode}
-                    required={false}
-                  >
-                    <option value="" disabled>
-                      Select
-                    </option>
-                    {(settings.deployments?.hybrid || []).map((item, i) => (
-                      <option key={i} value={item}>
-                        {item}
-                      </option>
-                    ))}
-                  </SelectField>
+                    <div className="col-span-full grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-4 max-sm:gap-x-3 max-sm:gap-y-3 ">
+                      <SelectField
+                        label="Hybrid"
+                        name="hybrid"
+                        value={pickup.hybrid}
+                        onChange={(e) => handlePickupChange(index, e)}
+                        disabled={!isEditMode}
+                        required={true}
+                      >
+                        <option value="" disabled>
+                          Select
+                        </option>
+                        {(settings.deployments?.hybrid || []).map((item, i) => (
+                          <option key={i} value={item}>
+                            {item}
+                          </option>
+                        ))}
+                      </SelectField>
 
-                  <SelectField
-                    label="Territory"
-                    name="territory"
-                    value={pickup.territory}
-                    onChange={(e) => handlePickupChange(index, e)}
-                    disabled={!isEditMode}
-                    required={false}
-                  >
-                    <option value="" disabled>
-                      Select
-                    </option>
-                    {(settings.deployments?.territory || []).map((item, i) => (
-                      <option key={i} value={item}>
-                        {item}
-                      </option>
-                    ))}
-                  </SelectField>
+                      <SelectField
+                        label="Territory"
+                        name="territory"
+                        value={pickup.territory}
+                        onChange={(e) => handlePickupChange(index, e)}
+                        disabled={!isEditMode}
+                        required={true}
+                      >
+                        <option value="" disabled>
+                          Select
+                        </option>
+                        {(settings.deployments?.territory || []).map(
+                          (item, i) => (
+                            <option key={i} value={item}>
+                              {item}
+                            </option>
+                          ),
+                        )}
+                      </SelectField>
 
-                  <SelectField
-                    label="Flagging"
-                    name="flagging"
-                    value={pickup.flagging}
-                    onChange={(e) => handlePickupChange(index, e)}
-                    disabled={!isEditMode}
-                    required={false}
-                  >
-                    <option value="" disabled>
-                      Select
-                    </option>
-                    {(settings.deployments?.flagging || []).map((item, i) => (
-                      <option key={i} value={item}>
-                        {item}
-                      </option>
-                    ))}
-                  </SelectField>
+                      <SelectField
+                        label="Flagging"
+                        name="flagging"
+                        value={pickup.flagging}
+                        onChange={(e) => handlePickupChange(index, e)}
+                        disabled={!isEditMode}
+                        required={true}
+                      >
+                        <option value="" disabled>
+                          Select
+                        </option>
+                        {(settings.deployments?.flagging || []).map(
+                          (item, i) => (
+                            <option key={i} value={item}>
+                              {item}
+                            </option>
+                          ),
+                        )}
+                      </SelectField>
 
-                  <InputField
-                    label="Flagging Remarks"
-                    name="flaggingRemarks"
-                    maxLength={50}
-                    value={pickup.flaggingRemarks}
-                    disabled={!isEditMode}
-                    onChange={(e) => handlePickupChange(index, e)}
-                    required={false}
-                  />
+                      <InputField
+                        label="Flagging Remarks"
+                        name="flaggingRemarks"
+                        maxLength={50}
+                        value={pickup.flaggingRemarks}
+                        disabled={!isEditMode}
+                        onChange={(e) => handlePickupChange(index, e)}
+                        required={false}
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
+
+            {isAdmin && (
+              <div className="flex justify-center absolute left-0 right-0 -bottom-4.5">
+                <button
+                  type="button"
+                  onClick={() => toggleCollapse(index)}
+                  className="bg-white text-sm md:text-base p-1.5 md:p-2 cursor-pointer rounded-full border border-gray-300 text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-transform duration-300"
+                  style={{
+                    transform:
+                      (collapsedStops[index] ?? true)
+                        ? "rotate(0deg)"
+                        : "rotate(180deg)",
+                  }}
+                >
+                  <HiOutlineChevronDown />
+                </button>
+              </div>
+            )}
           </div>
         ))}
 
