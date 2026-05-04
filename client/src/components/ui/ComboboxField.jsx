@@ -69,21 +69,25 @@ const ComboboxField = ({
           anchor={{ to: "bottom start", gap: 8 }}
           className="z-999 max-h-60 w-(--input-width) overflow-auto rounded-md bg-white border border-gray-200 py-1 text-xs focus:outline-none"
         >
-          {options.map((o) => (
-            <ComboboxOption
-              key={o.id}
-              value={o.id}
-              className={({ focus }) =>
-                clsx(
-                  "px-4 py-2 cursor-default select-none transition-colors",
-                  uppercase ? "uppercase" : "capitalize",
-                  { "bg-gray-50": focus },
-                )
-              }
-            >
-              {o.label}
-            </ComboboxOption>
-          ))}
+          {options.length === 0 ? (
+            <div className="px-4 py-2 text-gray-400 italic">Nothing found.</div>
+          ) : (
+            options.map((o) => (
+              <ComboboxOption
+                key={o.id}
+                value={o.id}
+                className={({ focus }) =>
+                  clsx(
+                    "px-4 py-2 cursor-default select-none transition-colors text-gray-800 hover:bg-gray-100 cursor-pointer",
+                    uppercase ? "uppercase" : "capitalize",
+                    { "bg-gray-50": focus },
+                  )
+                }
+              >
+                {o.label}
+              </ComboboxOption>
+            ))
+          )}
         </ComboboxOptions>
       </Combobox>
     )}

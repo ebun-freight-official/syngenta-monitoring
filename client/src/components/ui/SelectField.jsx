@@ -29,7 +29,7 @@ const SelectField = ({
         disabled={disabled}
         required={required}
         className={clsx(
-          "w-full appearance-none bg-transparent text-xs max-sm:text-xxs focus:outline-none capitalize",
+          "w-full appearance-none bg-transparent text-xs max-sm:text-xxs focus:outline-none capitalize truncate",
           disabled ? "text-gray-500" : "text-gray-800",
         )}
       >

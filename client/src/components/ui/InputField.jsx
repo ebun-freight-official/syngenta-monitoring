@@ -28,7 +28,7 @@ const InputField = ({
   );
 
   const inputClass = clsx(
-    "flex-1 min-w-0 text-xs max-sm:text-xxs bg-transparent placeholder-gray-400 focus:outline-none capitalize",
+    "flex-1 min-w-0 text-xs max-sm:text-xxs bg-transparent placeholder-gray-400 focus:outline-none capitalize truncate",
     disabled ? "text-gray-500" : "text-gray-800",
   );
 
@@ -57,7 +57,7 @@ const InputField = ({
       ) : type === "datetime-local" ? (
         <div
           className={clsx(
-            "relative flex items-center border rounded-md px-4 py-3 max-sm:px-2 max-sm:py-1 transition-all",
+            "relative flex items-center border rounded-md px-4 py-3 max-sm:px-3 max-sm:py-2.5 transition-all",
             disabled
               ? "bg-gray-50 border-gray-200"
               : "bg-white border-gray-200 focus-within:border-gray-400",

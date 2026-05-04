@@ -1475,6 +1475,7 @@ const DeploymentInfoTab = ({
               decimalScale={0}
               onChange={handleChange}
             />
+
             <InputField
               label="Total Load Wt. (kg)"
               type="number"
@@ -1509,6 +1510,7 @@ const DeploymentInfoTab = ({
             disabled={!isEditMode}
             onChange={handleChange}
           />
+
           <InputField
             label="Receiving Contact No."
             name="receivingContactPersonNo"
@@ -1692,193 +1694,218 @@ const PickupSitesTab = ({
                 ))}
               </SelectField>
 
-              <InputField
-                label="Scheduled Pickup Time"
-                type="datetime-local"
-                name="scheduledPickupTime"
-                value={pickup.scheduledPickupTime}
-                onChange={(e) => handlePickupChange(index, e)}
-                disabled={!isEditMode}
-                required={false}
-              />
+              <div className="max-md:hidden">
+                <InputField
+                  label="Scheduled Pickup Time"
+                  type="datetime-local"
+                  name="scheduledPickupTime"
+                  value={pickup.scheduledPickupTime}
+                  onChange={(e) => handlePickupChange(index, e)}
+                  disabled={!isEditMode}
+                  required={false}
+                />
+              </div>
 
-              <InputField
-                label="Sacks Count"
-                type="number"
-                name="sacksCount"
-                value={pickup.sacksCount}
-                onChange={(e) =>
-                  handlePickupNumericChange(index, "sacksCount", e.target.value)
-                }
-                disabled={!isEditMode}
-                required={false}
-                numeric
-                thousandSep={false}
-                decimalScale={0}
-              />
-
-              <InputField
-                label="Field Wt (Kg)"
-                type="number"
-                name="fieldWeightKg"
-                value={pickup.fieldWeightKg}
-                onChange={(e) =>
-                  handlePickupNumericChange(
-                    index,
-                    "fieldWeightKg",
-                    e.target.value,
-                  )
-                }
-                disabled={!isEditMode}
-                required={false}
-                numeric
-                decimalScale={2}
-              />
-
-              <InputField
-                label="Plant Wt (Kg)"
-                type="number"
-                name="plantWeightKg"
-                value={pickup.plantWeightKg}
-                onChange={(e) =>
-                  handlePickupNumericChange(
-                    index,
-                    "plantWeightKg",
-                    e.target.value,
-                  )
-                }
-                disabled={!isEditMode}
-                required={false}
-                numeric
-                decimalScale={2}
-              />
-
-              <SelectField
-                label="Field Contact Person"
-                name="fieldContactPerson"
-                value={pickup.fieldContactPerson}
-                onChange={(e) => {
-                  handlePickupChange(index, e);
-                  const persons =
-                    settings.deployments?.fieldContactPersons || [];
-                  const selected = persons.find(
-                    (p) => p.name === e.target.value,
-                  );
-                  if (selected) {
-                    handlePickupChange(index, {
-                      target: {
-                        name: "fieldContactPersonNo",
-                        value: selected.contactNo || "",
-                      },
-                    });
+              <div className="col-span-full grid grid-cols-3 gap-x-4 gap-y-4 max-sm:gap-x-3 max-sm:gap-y-3">
+                <InputField
+                  label="Sacks Count"
+                  type="number"
+                  name="sacksCount"
+                  value={pickup.sacksCount}
+                  onChange={(e) =>
+                    handlePickupNumericChange(
+                      index,
+                      "sacksCount",
+                      e.target.value,
+                    )
                   }
-                }}
-                disabled={!isEditMode}
-                required={false}
-              >
-                <option value="" disabled>
-                  Select
-                </option>
-                {(settings.deployments?.fieldContactPersons || []).map(
-                  (person, i) => (
-                    <option key={i} value={person.name ?? person}>
-                      {person.name ?? person}
+                  disabled={!isEditMode}
+                  required={false}
+                  numeric
+                  thousandSep={false}
+                  decimalScale={0}
+                />
+
+                <InputField
+                  label="Field Wt (Kg)"
+                  type="number"
+                  name="fieldWeightKg"
+                  value={pickup.fieldWeightKg}
+                  onChange={(e) =>
+                    handlePickupNumericChange(
+                      index,
+                      "fieldWeightKg",
+                      e.target.value,
+                    )
+                  }
+                  disabled={!isEditMode}
+                  required={false}
+                  numeric
+                  decimalScale={2}
+                />
+
+                <InputField
+                  label="Plant Wt (Kg)"
+                  type="number"
+                  name="plantWeightKg"
+                  value={pickup.plantWeightKg}
+                  onChange={(e) =>
+                    handlePickupNumericChange(
+                      index,
+                      "plantWeightKg",
+                      e.target.value,
+                    )
+                  }
+                  disabled={!isEditMode}
+                  required={false}
+                  numeric
+                  decimalScale={2}
+                />
+              </div>
+
+              {/* to hide */}
+              <div className="col-span-full grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-4 max-sm:gap-x-3 max-sm:gap-y-3">
+                <SelectField
+                  label="Field Contact Person"
+                  name="fieldContactPerson"
+                  value={pickup.fieldContactPerson}
+                  onChange={(e) => {
+                    handlePickupChange(index, e);
+                    const persons =
+                      settings.deployments?.fieldContactPersons || [];
+                    const selected = persons.find(
+                      (p) => p.name === e.target.value,
+                    );
+                    if (selected) {
+                      handlePickupChange(index, {
+                        target: {
+                          name: "fieldContactPersonNo",
+                          value: selected.contactNo || "",
+                        },
+                      });
+                    }
+                  }}
+                  disabled={!isEditMode}
+                  required={false}
+                >
+                  <option value="" disabled>
+                    Select
+                  </option>
+                  {(settings.deployments?.fieldContactPersons || []).map(
+                    (person, i) => (
+                      <option key={i} value={person.name ?? person}>
+                        {person.name ?? person}
+                      </option>
+                    ),
+                  )}
+                </SelectField>
+
+                <InputField
+                  label="Field Contact No."
+                  name="fieldContactPersonNo"
+                  placeholder="Contact Number"
+                  value={pickup.fieldContactPersonNo}
+                  disabled={!isEditMode}
+                  onChange={(e) => handlePickupChange(index, e)}
+                  maxLength={11}
+                  required={false}
+                />
+
+                <InputField
+                  label="Est. Wt (Kg)"
+                  type="number"
+                  name="estimatedWeightKg"
+                  value={pickup.estimatedWeightKg}
+                  onChange={(e) =>
+                    handlePickupNumericChange(
+                      index,
+                      "estimatedWeightKg",
+                      e.target.value,
+                    )
+                  }
+                  disabled={!isEditMode}
+                  numeric
+                  decimalScale={2}
+                />
+
+                <div className="md:hidden">
+                  <InputField
+                    label="Scheduled Pickup Time"
+                    type="datetime-local"
+                    name="scheduledPickupTime"
+                    value={pickup.scheduledPickupTime}
+                    onChange={(e) => handlePickupChange(index, e)}
+                    disabled={!isEditMode}
+                    required={false}
+                  />
+                </div>
+
+                <div className="col-span-full grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-4 max-sm:gap-x-3 max-sm:gap-y-3 ">
+                  <SelectField
+                    label="Hybrid"
+                    name="hybrid"
+                    value={pickup.hybrid}
+                    onChange={(e) => handlePickupChange(index, e)}
+                    disabled={!isEditMode}
+                    required={false}
+                  >
+                    <option value="" disabled>
+                      Select
                     </option>
-                  ),
-                )}
-              </SelectField>
+                    {(settings.deployments?.hybrid || []).map((item, i) => (
+                      <option key={i} value={item}>
+                        {item}
+                      </option>
+                    ))}
+                  </SelectField>
 
-              <InputField
-                label="Field Contact No."
-                name="fieldContactPersonNo"
-                placeholder="Contact Number"
-                value={pickup.fieldContactPersonNo}
-                disabled={!isEditMode}
-                onChange={(e) => handlePickupChange(index, e)}
-                maxLength={11}
-                required={false}
-              />
+                  <SelectField
+                    label="Territory"
+                    name="territory"
+                    value={pickup.territory}
+                    onChange={(e) => handlePickupChange(index, e)}
+                    disabled={!isEditMode}
+                    required={false}
+                  >
+                    <option value="" disabled>
+                      Select
+                    </option>
+                    {(settings.deployments?.territory || []).map((item, i) => (
+                      <option key={i} value={item}>
+                        {item}
+                      </option>
+                    ))}
+                  </SelectField>
 
-              <InputField
-                label="Est. Wt (Kg)"
-                type="number"
-                name="estimatedWeightKg"
-                value={pickup.estimatedWeightKg}
-                onChange={(e) =>
-                  handlePickupNumericChange(
-                    index,
-                    "estimatedWeightKg",
-                    e.target.value,
-                  )
-                }
-                disabled={!isEditMode}
-                numeric
-                decimalScale={2}
-              />
+                  <SelectField
+                    label="Flagging"
+                    name="flagging"
+                    value={pickup.flagging}
+                    onChange={(e) => handlePickupChange(index, e)}
+                    disabled={!isEditMode}
+                    required={false}
+                  >
+                    <option value="" disabled>
+                      Select
+                    </option>
+                    {(settings.deployments?.flagging || []).map((item, i) => (
+                      <option key={i} value={item}>
+                        {item}
+                      </option>
+                    ))}
+                  </SelectField>
 
-              <SelectField
-                label="Hybrid"
-                name="hybrid"
-                value={pickup.hybrid}
-                onChange={(e) => handlePickupChange(index, e)}
-                disabled={!isEditMode}
-                required={false}
-              >
-                <option value="" disabled>
-                  Select
-                </option>
-                {(settings.deployments?.hybrid || []).map((item, i) => (
-                  <option key={i} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </SelectField>
-
-              <SelectField
-                label="Territory"
-                name="territory"
-                value={pickup.territory}
-                onChange={(e) => handlePickupChange(index, e)}
-                disabled={!isEditMode}
-                required={false}
-              >
-                <option value="" disabled>
-                  Select
-                </option>
-                {(settings.deployments?.territory || []).map((item, i) => (
-                  <option key={i} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </SelectField>
-
-              <SelectField
-                label="Flagging"
-                name="flagging"
-                value={pickup.flagging}
-                onChange={(e) => handlePickupChange(index, e)}
-                disabled={!isEditMode}
-                required={false}
-              >
-                <option value="" disabled>
-                  Select
-                </option>
-                {(settings.deployments?.flagging || []).map((item, i) => (
-                  <option key={i} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </SelectField>
-
-              <InputField
-                label="Flagging Remarks"
-                name="flaggingRemarks"
-                maxLength={50}
-                value={pickup.flaggingRemarks}
-                disabled={!isEditMode}
-                onChange={(e) => handlePickupChange(index, e)}
-                required={false}
-              />
+                  <InputField
+                    label="Flagging Remarks"
+                    name="flaggingRemarks"
+                    maxLength={50}
+                    value={pickup.flaggingRemarks}
+                    disabled={!isEditMode}
+                    onChange={(e) => handlePickupChange(index, e)}
+                    required={false}
+                  />
+                </div>
+              </div>
             </div>
           </div>
         ))}
