@@ -5,7 +5,7 @@
 
 /* @plugin "daisyui"; */
 @plugin "daisyui" {
-  themes: "false";
+  themes: false;
 }
 
 @theme {
