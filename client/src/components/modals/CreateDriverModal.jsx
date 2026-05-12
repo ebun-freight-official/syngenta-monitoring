@@ -7,15 +7,14 @@ import {
 } from "@headlessui/react";
 import React, { useEffect, useState } from "react";
 import { IoClose } from "react-icons/io5";
-import { MdKeyboardArrowDown } from "react-icons/md";
-import { RiFolderUploadLine, RiCheckLine } from "react-icons/ri";
+import { RiCheckLine } from "react-icons/ri";
+import { TbUpload } from "react-icons/tb";
 import { toast } from "react-toastify";
-import clsx from "clsx";
 import useCreateDriver from "../../hooks/useCreateDriver";
 import { useSettingsContext } from "../../contexts/SettingsContext";
-import { no_image } from "../../consts/images";
 import ActionButton from "../ui/ActionButton";
-import { TbUpload } from "react-icons/tb";
+import InputField from "../ui/InputField";
+import SelectField from "../ui/SelectField";
 
 /* ─── DotPattern ─────────────────────────────────────────────────────────── */
 const DotPattern = () => (
@@ -159,10 +158,7 @@ function CreateDriverModal({ isOpen, onClose, onCreate }) {
                     <img
                       src={previewImage}
                       alt="Preview"
-                      className={clsx(
-                        "w-full h-full object-cover object-center transition-opacity",
-                        { "opacity-10": !previewImage },
-                      )}
+                      className="w-full h-full object-cover object-center transition-opacity"
                     />
                   ) : (
                     <div
@@ -171,9 +167,8 @@ function CreateDriverModal({ isOpen, onClose, onCreate }) {
                         background:
                           "linear-gradient(155deg, #020617 0%, #001e36 55%, #0f172a 100%)",
                       }}
-                    ></div>
+                    />
                   )}
-
                   <div className="absolute inset-0 bg-black/20 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 group-hover:transition-opacity text-white/40 gap-1">
                     <TbUpload className="text-xl max-md:text-base" />
                     <span className="text-xxs font-medium max-md:hidden">
@@ -215,7 +210,6 @@ function CreateDriverModal({ isOpen, onClose, onCreate }) {
                   <div className="flex-1 px-6 py-5 max-md:px-4 max-md:pt-4 grid grid-cols-2 gap-x-4 gap-y-4 max-md:gap-x-3 max-md:gap-y-3 content-start">
                     <InputField
                       label="First Name"
-                      type="text"
                       name="firstname"
                       placeholder="First name"
                       value={formData.firstname}
@@ -224,7 +218,6 @@ function CreateDriverModal({ isOpen, onClose, onCreate }) {
                     />
                     <InputField
                       label="Last Name"
-                      type="text"
                       name="lastname"
                       placeholder="Last name"
                       value={formData.lastname}
@@ -236,7 +229,6 @@ function CreateDriverModal({ isOpen, onClose, onCreate }) {
                       type="tel"
                       name="phoneNo"
                       placeholder="09XXXXXXXXX"
-                      pattern="^(09|\+639)\d{9}$"
                       value={formData.phoneNo}
                       onChange={handleChange}
                       disabled={isLoading}
@@ -244,14 +236,13 @@ function CreateDriverModal({ isOpen, onClose, onCreate }) {
                     />
                     <InputField
                       label="License No."
-                      type="text"
                       name="licenseNo"
                       placeholder="License No."
                       value={formData.licenseNo}
                       onChange={handleChange}
                       disabled={isLoading}
-                      isRequired={false}
-                      isUppercase
+                      required={false}
+                      maxLength={50}
                     />
                     <SelectField
                       label="Status"
@@ -259,7 +250,6 @@ function CreateDriverModal({ isOpen, onClose, onCreate }) {
                       value={formData.status}
                       onChange={handleChange}
                       disabled={isLoading}
-                      required
                     >
                       {settings.trucksDrivers.status.map((item, i) => (
                         <option key={i} value={item}>
@@ -273,7 +263,6 @@ function CreateDriverModal({ isOpen, onClose, onCreate }) {
                       value={formData.subcon}
                       onChange={handleChange}
                       disabled={isLoading}
-                      required
                     >
                       <option value="" disabled>
                         Select subcon
@@ -307,82 +296,5 @@ function CreateDriverModal({ isOpen, onClose, onCreate }) {
     </Transition>
   );
 }
-
-/* ─── InputField ─────────────────────────────────────────────────────────── */
-const InputField = ({
-  label,
-  type,
-  name,
-  placeholder,
-  value,
-  onChange,
-  disabled,
-  pattern,
-  maxLength,
-  isRequired = true,
-  isUppercase = false,
-}) => (
-  <label className="flex flex-col gap-1.5">
-    <span className="text-xxxs md:text-xxs font-semibold text-gray-600 uppercase tracking-wider">
-      {label} {isRequired && <span className="text-red-400">*</span>}
-    </span>
-    <div
-      className={clsx(
-        "flex items-center border rounded-md px-4 py-3 max-md:px-3 max-md:py-2.5 transition-all duration-200",
-        disabled
-          ? "bg-gray-50 border-gray-200"
-          : "bg-white border-gray-200 focus-within:border-gray-400",
-      )}
-    >
-      <input
-        type={type}
-        name={name}
-        placeholder={placeholder}
-        value={value}
-        minLength={2}
-        maxLength={maxLength || 50}
-        pattern={pattern}
-        onChange={onChange}
-        disabled={disabled}
-        required={isRequired}
-        className={clsx(
-          "flex-1 text-xs max-md:text-xxs placeholder-gray-400 bg-transparent focus:outline-none capitalize min-w-0",
-          disabled ? "text-gray-500" : "text-gray-800",
-          { uppercase: isUppercase },
-        )}
-      />
-    </div>
-  </label>
-);
-
-/* ─── SelectField ────────────────────────────────────────────────────────── */
-const SelectField = ({
-  label,
-  name,
-  value,
-  onChange,
-  disabled,
-  required,
-  children,
-}) => (
-  <div className="flex flex-col gap-1.5">
-    <span className="text-xxxs md:text-xxs font-semibold text-gray-600 uppercase tracking-wider">
-      {label} {required && <span className="text-red-400">*</span>}
-    </span>
-    <div className="relative flex items-center bg-white border border-gray-200 rounded-md px-4 py-3 max-md:px-3 max-md:py-2.5 focus-within:border-gray-400 transition-all">
-      <select
-        name={name}
-        value={value}
-        onChange={onChange}
-        disabled={disabled}
-        required={required}
-        className="w-full appearance-none bg-transparent text-xs max-md:text-xxs text-gray-800 focus:outline-none capitalize"
-      >
-        {children}
-      </select>
-      <MdKeyboardArrowDown className="absolute right-3 text-gray-400 text-base pointer-events-none" />
-    </div>
-  </div>
-);
 
 export default CreateDriverModal;

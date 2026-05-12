@@ -200,39 +200,41 @@ const deploymentSchema = new mongoose.Schema(
     },
 
     // ------------- replacement details ------------- //
-    replacement: {
-      replacementTruckId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Truck",
+    replacements: [
+      {
+        replacementTruckId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Truck",
+        },
+        replacementDriverId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Driver",
+        },
+        replacementTruckType: {
+          type: String,
+          trim: true,
+          lowercase: true,
+        },
+        replacedAt: {
+          type: String,
+          trim: true,
+          match: [
+            /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?)?$/,
+            "Invalid replacedAt time format",
+          ],
+        },
+        reason: {
+          type: String,
+          trim: true,
+          maxlength: [200, "Replacement reason cannot exceed 200 characters"],
+        },
+        remarks: {
+          type: String,
+          trim: true,
+          maxlength: [300, "Replacement remarks cannot exceed 300 characters"],
+        },
       },
-      replacementDriverId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Driver",
-      },
-      replacementTruckType: {
-        type: String,
-        trim: true,
-        lowercase: true,
-      },
-      replacedAt: {
-        type: String,
-        trim: true,
-        match: [
-          /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?)?$/,
-          "Invalid replacedAt time format",
-        ],
-      },
-      reason: {
-        type: String,
-        trim: true,
-        maxlength: [200, "Replacement reason cannot exceed 200 characters"],
-      },
-      remarks: {
-        type: String,
-        trim: true,
-        maxlength: [300, "Replacement remarks cannot exceed 300 characters"],
-      },
-    },
+    ],
 
     // ------------- timeline details ------------- //
     departed: {

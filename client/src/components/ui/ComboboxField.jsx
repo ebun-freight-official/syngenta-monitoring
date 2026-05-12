@@ -78,7 +78,7 @@ const ComboboxField = ({
                 value={o.id}
                 className={({ focus }) =>
                   clsx(
-                    "px-4 py-2 cursor-default select-none transition-colors text-gray-800 hover:bg-gray-100 cursor-pointer",
+                    "px-4 py-2 select-none transition-colors text-gray-800 hover:bg-gray-100 cursor-pointer",
                     uppercase ? "uppercase" : "capitalize",
                     { "bg-gray-50": focus },
                   )

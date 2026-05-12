@@ -5,21 +5,17 @@ import {
   DialogPanel,
   Transition,
   TransitionChild,
-  Combobox,
-  ComboboxInput,
-  ComboboxOption,
-  ComboboxOptions,
-  ComboboxButton,
 } from "@headlessui/react";
 import { IoClose } from "react-icons/io5";
-import { MdKeyboardArrowDown } from "react-icons/md";
 import { toast } from "react-toastify";
 import { TRUCK_REPLACEMENT_REASONS } from "../../utils/generalOptions";
-import clsx from "clsx";
 import { PiMapPinAreaFill } from "react-icons/pi";
 import useUpdateDeployment from "../../hooks/useUpdateDeployment";
 import { useSettingsContext } from "../../contexts/SettingsContext";
 import ActionButton from "../ui/ActionButton";
+import SelectField from "../ui/SelectField";
+import ComboboxField from "../ui/ComboboxField";
+import InputField from "../ui/InputField";
 
 function ReplacementModal({
   isOpen,
@@ -27,7 +23,6 @@ function ReplacementModal({
   deployment,
   drivers,
   trucks,
-  updateSelectedDeployment,
   onUpdate,
 }) {
   const [formData, setFormData] = useState({
@@ -45,27 +40,37 @@ function ReplacementModal({
   const { updateDeploymentFunction, isLoading } = useUpdateDeployment();
   const { settings } = useSettingsContext();
 
+  // Build allOptions (full list for display value lookup)
+  const allTrucks =
+    trucks?.map((t) => ({ id: t._id, label: t.plateNo.toUpperCase() })) || [];
+
+  const allDrivers =
+    drivers?.map((d) => ({
+      id: d._id,
+      label: `${d.firstname} ${d.lastname}`,
+    })) || [];
+
+  // Build filtered options shown in the dropdown
   const filteredTrucks =
-    trucks?.filter(
-      (truck) =>
-        truck.plateNo.toLowerCase().includes(truckQuery.toLowerCase()) &&
-        truck.status === "available" &&
-        truck._id !== deployment?.truckId?._id,
-    ) || [];
+    trucks
+      ?.filter(
+        (t) =>
+          t.plateNo.toLowerCase().includes(truckQuery.toLowerCase()) &&
+          t.status === "available" &&
+          t._id !== deployment?.truckId?._id,
+      )
+      .map((t) => ({ id: t._id, label: t.plateNo.toUpperCase() })) || [];
 
   const filteredDrivers =
-    drivers?.filter(
-      (driver) =>
-        (driver.firstname.toLowerCase().includes(driverQuery.toLowerCase()) ||
-          driver.lastname.toLowerCase().includes(driverQuery.toLowerCase())) &&
-        driver.status === "available" &&
-        driver._id !== deployment?.driverId?._id,
-    ) || [];
-
-  const selectedTruck = trucks?.find((truck) => truck._id === formData.truckId);
-  const selectedDriver = drivers?.find(
-    (driver) => driver._id === formData.driverId,
-  );
+    drivers
+      ?.filter(
+        (d) =>
+          (d.firstname.toLowerCase().includes(driverQuery.toLowerCase()) ||
+            d.lastname.toLowerCase().includes(driverQuery.toLowerCase())) &&
+          d.status === "available" &&
+          d._id !== deployment?.driverId?._id,
+      )
+      .map((d) => ({ id: d._id, label: `${d.firstname} ${d.lastname}` })) || [];
 
   const handleClose = () => {
     onClose();
@@ -126,7 +131,7 @@ function ReplacementModal({
         onClose();
       }
     };
-    document.addEventListener("keydown", handleKeyDown, true); // capture phase
+    document.addEventListener("keydown", handleKeyDown, true);
     return () => document.removeEventListener("keydown", handleKeyDown, true);
   }, [isOpen]);
 
@@ -190,16 +195,10 @@ function ReplacementModal({
                       onChange={(value) =>
                         setFormData((prev) => ({ ...prev, truckId: value }))
                       }
-                      displayValue={() =>
-                        selectedTruck ? selectedTruck.plateNo.toUpperCase() : ""
-                      }
-                      onQueryChange={(e) => setTruckQuery(e.target.value)}
-                      options={filteredTrucks.map((t) => ({
-                        value: t._id,
-                        label: t.plateNo.toUpperCase(),
-                      }))}
-                      placeholder="Search plate no."
-                      isUppercase
+                      onQueryChange={setTruckQuery}
+                      allOptions={allTrucks}
+                      options={filteredTrucks}
+                      uppercase
                     />
 
                     {/* Truck Type */}
@@ -208,8 +207,19 @@ function ReplacementModal({
                       name="truckType"
                       value={formData.truckType}
                       onChange={handleChange}
-                      options={settings.trucksDrivers.truckType}
-                    />
+                    >
+                      <option value="" disabled>
+                        Select
+                      </option>
+                      {settings.trucksDrivers.truckType.map((item, i) => {
+                        const isObj = typeof item === "object" && item !== null;
+                        return (
+                          <option key={i} value={isObj ? item.value : item}>
+                            {isObj ? item.label : item}
+                          </option>
+                        );
+                      })}
+                    </SelectField>
 
                     {/* Replacement Driver */}
                     <div className="col-span-2">
@@ -219,17 +229,9 @@ function ReplacementModal({
                         onChange={(value) =>
                           setFormData((prev) => ({ ...prev, driverId: value }))
                         }
-                        displayValue={() =>
-                          selectedDriver
-                            ? `${selectedDriver.firstname} ${selectedDriver.lastname}`
-                            : ""
-                        }
-                        onQueryChange={(e) => setDriverQuery(e.target.value)}
-                        options={filteredDrivers.map((d) => ({
-                          value: d._id,
-                          label: `${d.firstname} ${d.lastname}`,
-                        }))}
-                        placeholder="Search driver name"
+                        onQueryChange={setDriverQuery}
+                        allOptions={allDrivers}
+                        options={filteredDrivers}
                       />
                     </div>
 
@@ -240,7 +242,6 @@ function ReplacementModal({
                       name="replacedAt"
                       value={formData.replacedAt}
                       onChange={handleChange}
-                      isCapitalize={false}
                     />
 
                     {/* Reason */}
@@ -249,8 +250,19 @@ function ReplacementModal({
                       name="reason"
                       value={formData.reason}
                       onChange={handleChange}
-                      options={TRUCK_REPLACEMENT_REASONS}
-                    />
+                    >
+                      <option value="" disabled>
+                        Select
+                      </option>
+                      {TRUCK_REPLACEMENT_REASONS.map((item, i) => {
+                        const isObj = typeof item === "object" && item !== null;
+                        return (
+                          <option key={i} value={isObj ? item.value : item}>
+                            {isObj ? item.label : item}
+                          </option>
+                        );
+                      })}
+                    </SelectField>
 
                     {/* Remarks */}
                     <div className="col-span-2 flex flex-col gap-1.5">
@@ -292,150 +304,5 @@ function ReplacementModal({
     </Transition>
   );
 }
-
-/* ─── ComboboxField ─────────────────────────────────────────────────────── */
-const ComboboxField = ({
-  label,
-  value,
-  onChange,
-  displayValue,
-  onQueryChange,
-  options,
-  placeholder,
-  required = true,
-  isUppercase = false,
-}) => (
-  <div className="flex flex-col gap-1.5">
-    <span className="text-xxxs md:text-xxs font-semibold text-gray-600 uppercase tracking-wider">
-      {label} {required && <span className="text-red-400">*</span>}
-    </span>
-    <Combobox value={value} onChange={onChange}>
-      <div className="relative flex items-center bg-white border border-gray-200 rounded-md px-4 py-3 max-md:px-3 max-md:py-2.5 focus-within:border-gray-400 transition-all duration-200">
-        <ComboboxInput
-          className={clsx(
-            "w-full bg-transparent text-xs max-md:text-xxs text-gray-800 placeholder-gray-400 focus:outline-none",
-            isUppercase ? "uppercase" : "capitalize",
-          )}
-          displayValue={displayValue}
-          onChange={onQueryChange}
-          placeholder={placeholder}
-          required={required}
-          autoComplete="off"
-        />
-        <ComboboxButton className="absolute right-3 flex items-center text-gray-400 transition-colors">
-          <MdKeyboardArrowDown className="text-base" />
-        </ComboboxButton>
-        <ComboboxOptions className="absolute z-50 top-full left-0 mt-1.5 max-h-48 w-full overflow-auto rounded-md bg-white border border-gray-200 shadow-md py-1 text-xs focus:outline-none">
-          {options.length === 0 ? (
-            <div className="px-4 py-2 text-gray-400 text-xs italic">
-              Nothing found.
-            </div>
-          ) : (
-            options.map((opt) => (
-              <ComboboxOption
-                key={opt.value}
-                value={opt.value}
-                className={({ focus }) =>
-                  clsx(
-                    "px-4 py-2 cursor-default select-none transition-colors",
-                    isUppercase ? "uppercase" : "capitalize",
-                    {
-                      "bg-gray-50": focus,
-                      "bg-gray-100 font-medium": value === opt.value,
-                    },
-                  )
-                }
-              >
-                {opt.label}
-              </ComboboxOption>
-            ))
-          )}
-        </ComboboxOptions>
-      </div>
-    </Combobox>
-  </div>
-);
-
-/* ─── SelectField ───────────────────────────────────────────────────────── */
-const SelectField = ({
-  label,
-  name,
-  value,
-  onChange,
-  options,
-  required = true,
-}) => (
-  <div className="flex flex-col gap-1.5">
-    <span className="text-xxxs md:text-xxs font-semibold text-gray-600 uppercase tracking-wider">
-      {label} {required && <span className="text-red-400">*</span>}
-    </span>
-    <div className="relative flex items-center bg-white border border-gray-200 rounded-md px-4 py-3 max-md:px-3 max-md:py-2.5 focus-within:border-gray-400 transition-all duration-200">
-      <select
-        name={name}
-        value={value}
-        onChange={onChange}
-        required={required}
-        className="w-full appearance-none bg-transparent text-xs max-md:text-xxs text-gray-800 focus:outline-none capitalize"
-      >
-        <option value="" disabled>
-          Select
-        </option>
-        {options.map((item, index) => {
-          const isObj = typeof item === "object" && item !== null;
-          return (
-            <option key={index} value={isObj ? item.value : item}>
-              {isObj ? item.label : item}
-            </option>
-          );
-        })}
-      </select>
-      <MdKeyboardArrowDown className="absolute right-3 text-gray-400 text-base pointer-events-none" />
-    </div>
-  </div>
-);
-
-/* ─── InputField ────────────────────────────────────────────────────────── */
-const InputField = ({
-  label,
-  type,
-  name,
-  placeholder,
-  value,
-  onChange,
-  disabled,
-  maxLength,
-  isRequired = true,
-  isCapitalize = true,
-}) => (
-  <label className="flex flex-col gap-1.5">
-    <span className="text-xxxs md:text-xxs font-semibold text-gray-600 uppercase tracking-wider">
-      {label} {isRequired && <span className="text-red-400">*</span>}
-    </span>
-    <div
-      className={clsx(
-        "flex items-center border rounded-md px-4 py-3 max-md:px-3 max-md:py-2.5 transition-all duration-200",
-        disabled
-          ? "bg-gray-50 border-gray-200"
-          : "bg-white border-gray-200 focus-within:border-gray-400",
-      )}
-    >
-      <input
-        type={type}
-        name={name}
-        placeholder={placeholder}
-        value={value}
-        maxLength={maxLength || 50}
-        onChange={onChange}
-        disabled={disabled}
-        required={isRequired}
-        className={clsx(
-          "flex-1 text-xs max-md:text-xxs placeholder-gray-400 bg-transparent focus:outline-none min-w-0",
-          disabled ? "text-gray-500" : "text-gray-800",
-          { capitalize: isCapitalize && type !== "datetime-local" },
-        )}
-      />
-    </div>
-  </label>
-);
 
 export default ReplacementModal;

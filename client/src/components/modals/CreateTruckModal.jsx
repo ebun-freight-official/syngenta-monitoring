@@ -1,4 +1,3 @@
-import React, { useEffect, useState } from "react";
 import {
   Dialog,
   DialogBackdrop,
@@ -6,16 +5,15 @@ import {
   Transition,
   TransitionChild,
 } from "@headlessui/react";
+import React, { useEffect, useState } from "react";
 import { IoClose } from "react-icons/io5";
-import { MdKeyboardArrowDown } from "react-icons/md";
-import { TbCheck } from "react-icons/tb";
-import { NumericFormat } from "react-number-format";
+import { TbCheck, TbUpload } from "react-icons/tb";
 import { toast } from "react-toastify";
-import clsx from "clsx";
 import useCreateTruck from "../../hooks/useCreateTruck";
 import { useSettingsContext } from "../../contexts/SettingsContext";
-import { TbUpload } from "react-icons/tb";
 import ActionButton from "../ui/ActionButton";
+import InputField from "../ui/InputField";
+import SelectField from "../ui/SelectField";
 
 /* ─── Decorative dot pattern ────────────────────────────────────────────── */
 const DotPattern = () => (
@@ -208,27 +206,21 @@ function CreateTruckModal({ isOpen, onClose, onCreate }) {
                 {/* Form */}
                 <form onSubmit={handleSubmit} className="flex-1 flex flex-col">
                   <div className="flex-1 px-6 py-5 max-md:px-4 max-md:pt-4 grid grid-cols-2 gap-x-4 gap-y-4 max-md:gap-x-3 max-md:gap-y-3 content-start">
-                    {/* Plate No. */}
                     <InputField
                       label="Plate No."
-                      type="text"
                       name="plateNo"
                       placeholder="Plate No."
                       value={formData.plateNo}
                       onChange={handleChange}
                       disabled={isLoading}
                       maxLength={7}
-                      isUppercase
                     />
-
-                    {/* Truck Type */}
                     <SelectField
                       label="Type"
                       name="truckType"
                       value={formData.truckType}
                       onChange={handleChange}
                       disabled={isLoading}
-                      required
                     >
                       <option value="" disabled>
                         Select type
@@ -239,41 +231,24 @@ function CreateTruckModal({ isOpen, onClose, onCreate }) {
                         </option>
                       ))}
                     </SelectField>
-
-                    {/* Max Load */}
-                    <div className="flex flex-col gap-1.5">
-                      <span className="text-xxxs md:text-xxs font-semibold text-gray-600 uppercase tracking-wider">
-                        Max Load (kg)
-                      </span>
-                      <div className="flex items-center bg-white border border-gray-200 rounded-md px-4 py-3 max-md:px-3 max-md:py-2.5 focus-within:border-gray-400 transition-all">
-                        <NumericFormat
-                          thousandSeparator
-                          decimalScale={0}
-                          allowNegative={false}
-                          value={formData.maxLoad}
-                          onValueChange={(values) =>
-                            handleChange({
-                              target: {
-                                name: "maxLoad",
-                                value: values.floatValue || "",
-                              },
-                            })
-                          }
-                          placeholder="0.00"
-                          disabled={isLoading}
-                          className="flex-1 text-xs max-md:text-xxs text-gray-800 placeholder-gray-400 bg-transparent focus:outline-none min-w-0"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Status */}
+                    <InputField
+                      label="Max Load (kg)"
+                      name="maxLoad"
+                      placeholder="0"
+                      value={formData.maxLoad}
+                      onChange={handleChange}
+                      disabled={isLoading}
+                      numeric
+                      thousandSep
+                      decimalScale={0}
+                      allowNegative={false}
+                    />
                     <SelectField
                       label="Status"
                       name="status"
                       value={formData.status}
                       onChange={handleChange}
                       disabled={isLoading}
-                      required
                     >
                       {settings.trucksDrivers.status.map((item, i) => (
                         <option key={i} value={item}>
@@ -281,8 +256,6 @@ function CreateTruckModal({ isOpen, onClose, onCreate }) {
                         </option>
                       ))}
                     </SelectField>
-
-                    {/* Subcon — full width */}
                     <div className="col-span-2">
                       <SelectField
                         label="Subcon"
@@ -290,7 +263,6 @@ function CreateTruckModal({ isOpen, onClose, onCreate }) {
                         value={formData.subcon}
                         onChange={handleChange}
                         disabled={isLoading}
-                        required
                       >
                         <option value="" disabled>
                           Select subcon
@@ -325,80 +297,5 @@ function CreateTruckModal({ isOpen, onClose, onCreate }) {
     </Transition>
   );
 }
-
-/* ─── InputField ─────────────────────────────────────────────────────────── */
-const InputField = ({
-  label,
-  type,
-  name,
-  placeholder,
-  value,
-  onChange,
-  disabled,
-  maxLength,
-  isRequired = true,
-  isUppercase = false,
-}) => (
-  <label className="flex flex-col gap-1.5">
-    <span className="text-xxxs md:text-xxs font-semibold text-gray-600 uppercase tracking-wider">
-      {label} {isRequired && <span className="text-red-400">*</span>}
-    </span>
-    <div
-      className={clsx(
-        "flex items-center border rounded-md px-4 py-3 max-md:px-3 max-md:py-2.5 transition-all duration-200",
-        disabled
-          ? "bg-gray-50 border-gray-200"
-          : "bg-white border-gray-200 focus-within:border-gray-400",
-      )}
-    >
-      <input
-        type={type}
-        name={name}
-        placeholder={placeholder}
-        value={value}
-        minLength={2}
-        maxLength={maxLength || 30}
-        onChange={onChange}
-        disabled={disabled}
-        required={isRequired}
-        className={clsx(
-          "flex-1 text-xs max-md:text-xxs placeholder-gray-400 bg-transparent focus:outline-none capitalize min-w-0",
-          disabled ? "text-gray-500" : "text-gray-800",
-          { uppercase: isUppercase },
-        )}
-      />
-    </div>
-  </label>
-);
-
-/* ─── SelectField ────────────────────────────────────────────────────────── */
-const SelectField = ({
-  label,
-  name,
-  value,
-  onChange,
-  disabled,
-  required,
-  children,
-}) => (
-  <div className="flex flex-col gap-1.5">
-    <span className="text-xxxs md:text-xxs font-semibold text-gray-600 uppercase tracking-wider">
-      {label} {required && <span className="text-red-400">*</span>}
-    </span>
-    <div className="relative flex items-center bg-white border border-gray-200 rounded-md px-4 py-3 max-md:px-3 max-md:py-2.5 focus-within:border-gray-400 transition-all">
-      <select
-        name={name}
-        value={value}
-        onChange={onChange}
-        disabled={disabled}
-        required={required}
-        className="w-full appearance-none bg-transparent text-xs max-md:text-xxs text-gray-800 focus:outline-none capitalize"
-      >
-        {children}
-      </select>
-      <MdKeyboardArrowDown className="absolute right-3 text-gray-400 text-base pointer-events-none" />
-    </div>
-  </div>
-);
 
 export default CreateTruckModal;

@@ -5,10 +5,23 @@ import {
   Transition,
   TransitionChild,
 } from "@headlessui/react";
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import { IoClose } from "react-icons/io5";
 import { DateTime } from "luxon";
 import clsx from "clsx";
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const formatDate = (iso) => {
+  if (!iso) return "N/A";
+  const dt = DateTime.fromISO(iso).setZone("Asia/Manila");
+  return dt.isValid ? dt.toFormat("MMM d, yyyy – hh:mm a") : "N/A";
+};
+
+const driverName = (d) =>
+  d ? `${d.firstname ?? ""} ${d.lastname ?? ""}`.trim() || "N/A" : "N/A";
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 function ReplacementHistoryModal({ isOpen, onClose, deployment }) {
   useEffect(() => {
@@ -19,9 +32,18 @@ function ReplacementHistoryModal({ isOpen, onClose, deployment }) {
         onClose();
       }
     };
-    document.addEventListener("keydown", handleKeyDown, true); // capture phase
+    document.addEventListener("keydown", handleKeyDown, true);
     return () => document.removeEventListener("keydown", handleKeyDown, true);
-  }, [isOpen]);
+  }, [isOpen, onClose]);
+
+  const replacementEvents = useMemo(() => {
+    const list = deployment?.replacements ?? [];
+    return [...list].sort((a, b) => {
+      const ta = a.replacedAt ? new Date(a.replacedAt).getTime() : 0;
+      const tb = b.replacedAt ? new Date(b.replacedAt).getTime() : 0;
+      return tb - ta;
+    });
+  }, [deployment]);
 
   return (
     <Transition show={isOpen} as={React.Fragment}>
@@ -49,14 +71,15 @@ function ReplacementHistoryModal({ isOpen, onClose, deployment }) {
             leaveTo="-translate-y-full opacity-0"
           >
             <DialogPanel className="font-poppins w-full max-w-3xl rounded-xl bg-white shadow-lg overflow-hidden flex flex-col max-h-[88vh] max-md:max-h-[80vh]">
-              {/* Header */}
+              {/* ── Header ── */}
               <div className="flex items-start justify-between px-6 pt-5 pb-4 max-md:px-4 max-md:pt-4 max-md:pb-3 border-b border-gray-200 shrink-0">
                 <div>
                   <h2 className="text-gray-900 font-bold text-base max-md:text-sm">
                     Replacement History
                   </h2>
                   <p className="text-gray-400 text-xxs mt-0.5">
-                    Original vs. replacement assignment details.
+                    Latest replacements shown first, original assignment at the
+                    bottom.
                   </p>
                 </div>
                 <button
@@ -67,117 +90,25 @@ function ReplacementHistoryModal({ isOpen, onClose, deployment }) {
                 </button>
               </div>
 
-              {/* Scrollable body */}
+              {/* ── Body (scrollable) ── */}
               <div className="flex-1 overflow-y-auto scrollbar-thin min-h-0">
-                <div className="px-6 py-5 max-md:px-4 max-md:py-4 flex flex-col gap-5">
-                  {/* Original vs Replacement */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* Original Assignment */}
-                    <div className="flex flex-col gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-orange-400 shrink-0" />
-                        <h3 className="text-xxxs md:text-xxs font-semibold text-gray-600 uppercase tracking-wider">
-                          Original Assignment
-                        </h3>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3 bg-gray-50 rounded-xl p-4 border border-gray-200">
-                        <StaticField
-                          label="Plate No."
-                          value={deployment?.truckId?.plateNo}
-                          isUppercase
-                        />
-                        <StaticField
-                          label="Truck Type"
-                          value={deployment?.truckType}
-                          isCapitalize
-                        />
-                        <div className="col-span-2">
-                          <StaticField
-                            label="Driver"
-                            value={`${deployment?.driverId?.firstname} ${deployment?.driverId?.lastname}`}
-                            isCapitalize
-                          />
-                        </div>
-                      </div>
-                    </div>
+                <div className="px-6 py-5 max-md:px-4 max-md:py-4 flex flex-col gap-4">
+                  <section className="flex flex-col gap-4">
+                    <SectionLabel
+                      color="bg-blue-400"
+                      label={`History (${replacementEvents.length + 1})`}
+                    />
 
-                    {/* Replacement Assignment */}
-                    <div className="flex flex-col gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
-                        <h3 className="text-xxxs md:text-xxs font-semibold text-gray-600 uppercase tracking-wider">
-                          Replacement Assignment
-                        </h3>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3 bg-gray-50 rounded-xl p-4 border border-gray-200">
-                        <StaticField
-                          label="Plate No."
-                          value={
-                            deployment?.replacement?.replacementTruckId?.plateNo
-                          }
-                          isUppercase
-                        />
-                        <StaticField
-                          label="Truck Type"
-                          value={deployment?.replacement?.replacementTruckType}
-                          isCapitalize
-                        />
-                        <div className="col-span-2">
-                          <StaticField
-                            label="Driver"
-                            value={`${deployment?.replacement?.replacementDriverId?.firstname} ${deployment?.replacement?.replacementDriverId?.lastname}`}
-                            isCapitalize
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                    {replacementEvents.map((entry, idx) => (
+                      <ReplacementEntry
+                        key={idx}
+                        entry={entry}
+                        isLatest={idx === 0}
+                      />
+                    ))}
 
-                  {/* Replacement Details */}
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="w-2 h-2 rounded-full bg-gray-400 shrink-0" />
-                      <h3 className="text-xxxs md:text-xxs font-semibold text-gray-600 uppercase tracking-wider">
-                        Replacement Details
-                      </h3>
-                    </div>
-                    <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="flex flex-col gap-4">
-                        <StaticField
-                          label="Reason for Replacement"
-                          value={deployment?.replacement?.reason?.replace(
-                            /_/g,
-                            " ",
-                          )}
-                          isCapitalize
-                        />
-                        <StaticField
-                          label="Replaced At"
-                          value={DateTime.fromISO(
-                            deployment?.replacement?.replacedAt,
-                          )
-                            .setZone("Asia/Manila")
-                            .toFormat("MMM d, yyyy - hh:mm a")}
-                        />
-                      </div>
-
-                      {/* Remarks */}
-                      <div className="flex flex-col gap-1.5">
-                        <span className="text-xxxs md:text-xxs font-semibold text-gray-500 uppercase tracking-wider">
-                          Remarks
-                        </span>
-                        <div className="flex-1 bg-white border border-gray-200 rounded-md px-4 py-3 max-md:px-3 max-md:py-2.5 min-h-16">
-                          <p className="text-xs max-md:text-xxs text-gray-700 leading-relaxed">
-                            {deployment?.replacement?.remarks || (
-                              <span className="text-gray-400 italic">
-                                No remarks provided.
-                              </span>
-                            )}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                    <OriginalEntry deployment={deployment} />
+                  </section>
                 </div>
               </div>
             </DialogPanel>
@@ -188,7 +119,122 @@ function ReplacementHistoryModal({ isOpen, onClose, deployment }) {
   );
 }
 
-/* ─── StaticField ───────────────────────────────────────────────────────── */
+// ─── ReplacementEntry ─────────────────────────────────────────────────────────
+
+function ReplacementEntry({ entry, isLatest }) {
+  return (
+    <div className="flex gap-3">
+      {/* Card */}
+      <div className="flex-1 pb-2">
+        <div className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
+          {/* Card header — date left, badge right */}
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-200 bg-white flex-wrap gap-2">
+            <span className="text-gray-500 text-xxs">
+              {formatDate(entry.replacedAt)}
+            </span>
+            {isLatest && (
+              <span className="text-xxs font-semibold px-2 py-0.5 rounded-full border bg-emerald-100 text-emerald-600 border-emerald-200">
+                Current
+              </span>
+            )}
+          </div>
+
+          {/* Card body */}
+          <div className="p-4 max-sm:p-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {/* Row 1: Truck + Driver */}
+              <StaticField
+                label="Plate No."
+                value={entry.replacementTruckId?.plateNo}
+                isUppercase
+              />
+              <StaticField
+                label="Truck Type"
+                value={entry.replacementTruckType}
+                isCapitalize
+              />
+              <StaticField
+                label="Driver"
+                value={driverName(entry.replacementDriverId)}
+                isCapitalize
+              />
+
+              <StaticField
+                label="Reason"
+                value={entry.reason?.replace(/_/g, " ")}
+                isCapitalize
+              />
+
+              <div className="col-span-2">
+                <StaticField
+                  label="Remarks"
+                  value={entry.remarks || " "}
+                  isCapitalize
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── OriginalEntry ────────────────────────────────────────────────────────────
+
+function OriginalEntry({ deployment }) {
+  return (
+    <div className="flex gap-3">
+      {/* Card */}
+      <div className="flex-1 pb-2">
+        <div className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
+          {/* Card header */}
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-200 bg-white">
+            <span className="text-gray-500 text-xxs">Original Assignment</span>
+            <span className="text-xxs font-semibold px-2 py-0.5 rounded-full border bg-orange-100 text-orange-500 border-orange-200">
+              Original
+            </span>
+          </div>
+
+          {/* Card body */}
+          <div className="p-4 max-sm:p-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <StaticField
+                label="Plate No."
+                value={deployment?.truckId?.plateNo}
+                isUppercase
+              />
+              <StaticField
+                label="Truck Type"
+                value={deployment?.truckType}
+                isCapitalize
+              />
+              <div className="col-span-2 sm:col-span-1">
+                <StaticField
+                  label="Driver"
+                  value={driverName(deployment?.driverId)}
+                  isCapitalize
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Small reusables ──────────────────────────────────────────────────────────
+
+const SectionLabel = ({ color, label }) => (
+  <div className="flex items-center gap-2">
+    <span className={clsx("w-2 h-2 rounded-full shrink-0", color)} />
+    <h3 className="text-xxxs md:text-xxs font-semibold text-gray-600 uppercase tracking-wider">
+      {label}
+    </h3>
+  </div>
+);
+
 const StaticField = ({
   label,
   value,
@@ -196,12 +242,12 @@ const StaticField = ({
   isUppercase = false,
 }) => (
   <div className="flex flex-col gap-1.5">
-    <span className="text-xxxs md:text-xxs font-semibold text-gray-500 uppercase tracking-wider">
+    <span className="text-xxxs md:text-xxs font-semibold text-gray-600 uppercase tracking-wider truncate">
       {label}
     </span>
     <div
       className={clsx(
-        "bg-white border border-gray-200 rounded-md px-4 py-3 max-md:px-3 max-md:py-2.5 text-xs max-md:text-xxs font-medium text-gray-700",
+        "bg-white border border-gray-200 rounded-md px-4 py-3 max-sm:px-3 max-sm:py-2.5 text-xs max-sm:text-xxs truncate transition-all",
         { capitalize: isCapitalize, uppercase: isUppercase },
       )}
     >

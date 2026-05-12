@@ -36,6 +36,7 @@ import {
   RiDeleteBin6Line,
   RiCloseLine,
   RiCheckLine,
+  RiTruckLine,
 } from "react-icons/ri";
 import { FiPlus, FiTrash2 } from "react-icons/fi";
 import { useRef } from "react";
@@ -65,6 +66,35 @@ const defaultPickup = {
   flagging: "",
   flaggingRemarks: "",
 };
+
+// ─── Replacement helpers (mirrors backend logic) ──────────────────────────────
+
+/** Returns the latest replacement truck object (populated or raw ID) */
+const getActiveReplacementTruck = (replacements) =>
+  replacements
+    ?.slice()
+    .reverse()
+    .find((r) => r.replacementTruckId)?.replacementTruckId || null;
+
+/** Returns the latest replacement driver object (populated or raw ID) */
+const getActiveReplacementDriver = (replacements) =>
+  replacements
+    ?.slice()
+    .reverse()
+    .find((r) => r.replacementDriverId)?.replacementDriverId || null;
+
+/** Returns the latest replacement truck type from the replacements array */
+const getActiveReplacementTruckType = (replacements) =>
+  replacements
+    ?.slice()
+    .reverse()
+    .find((r) => r.replacementTruckId)?.replacementTruckType || null;
+
+/** Safely extract _id whether value is a populated object or a raw string ID */
+const extractId = (val) =>
+  val && typeof val === "object" ? val._id : val || null;
+
+// ─── DotPattern ───────────────────────────────────────────────────────────────
 
 const DotPattern = () => (
   <svg
@@ -234,12 +264,12 @@ function DeploymentDetailsModal({
     return () => mql.removeEventListener("change", handler);
   }, [activeTab]);
 
+  // ── Detect active replacement from the new `replacements` array ──────────────
   useEffect(() => {
-    if (deployment?.replacement?.replacementTruckId?._id) {
-      setIsReplacementShow(true);
-    } else {
-      setIsReplacementShow(false);
-    }
+    const hasReplacement = deployment?.replacements?.some(
+      (r) => r.replacementTruckId || r.replacementDriverId,
+    );
+    setIsReplacementShow(!!hasReplacement);
   }, [deployment, isOpen]);
 
   const filteredTrucks =
@@ -274,17 +304,32 @@ function DeploymentDetailsModal({
         d.lastname.toLowerCase().includes(replacementDriverQuery.toLowerCase()),
     ) || [];
 
+  // ── Derive active truck/driver IDs from replacements array ───────────────────
+  // Priority: pending edit form replacement > latest from replacements array > original
+  const latestReplacementTruck = getActiveReplacementTruck(
+    editForm?.replacements,
+  );
+  const latestReplacementDriver = getActiveReplacementDriver(
+    editForm?.replacements,
+  );
+
   const currentTruckId = isReplacementShow
-    ? editForm?.replacement?.replacementTruckId?._id
-    : editForm?.truckId?._id;
+    ? extractId(editForm?.replacement?.replacementTruckId) ||
+      extractId(latestReplacementTruck)
+    : extractId(editForm?.truckId);
+
   const currentDriverId = isReplacementShow
-    ? editForm?.replacement?.replacementDriverId?._id
-    : editForm?.driverId?._id;
+    ? extractId(editForm?.replacement?.replacementDriverId) ||
+      extractId(latestReplacementDriver)
+    : extractId(editForm?.driverId);
+
   const currentTruck = trucks?.find((t) => t._id === currentTruckId);
   const currentDriver = drivers?.find((d) => d._id === currentDriverId);
 
   const pickups = editForm?.pickups || [];
   const lastPickupOut = pickups[pickups.length - 1]?.pickupOut;
+
+  const replacementCount = deployment?.replacements?.length || 0;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -775,6 +820,7 @@ function DeploymentDetailsModal({
                           handleComboboxChange={handleComboboxChange}
                           openReplacementModal={openReplacementModal}
                           openReplacementHistory={openReplacementHistory}
+                          replacementCount={replacementCount}
                         />
                       </div>
                     )}
@@ -823,12 +869,6 @@ function DeploymentDetailsModal({
                       ) : (
                         <>
                           <ActionButton
-                            icon={RiEditLine}
-                            color="blue"
-                            onClick={() => setIsEditMode(true)}
-                            title="Update"
-                          />
-                          <ActionButton
                             icon={TbPrinter}
                             color="green"
                             onClick={handlePrintTMO}
@@ -836,11 +876,26 @@ function DeploymentDetailsModal({
                           />
                           <ActionButton
                             icon={TbReceipt}
-                            color="orange"
+                            color="purple"
                             onClick={() => openPaySlipModal()}
                             title="Pay Slip"
                           />
-                          <div className="ml-auto">
+
+                          <div className="ml-auto flex items-center gap-2">
+                            <ActionButton
+                              icon={RiEditLine}
+                              color="blue"
+                              onClick={() => setIsEditMode(true)}
+                              title="Update"
+                            />
+
+                            <ActionButton
+                              icon={RiTruckLine}
+                              color="orange"
+                              onClick={openReplacementModal}
+                              title="Replace Truck/Driver"
+                            />
+
                             <ActionButton
                               icon={RiDeleteBin6Line}
                               color="red"
@@ -863,8 +918,6 @@ function DeploymentDetailsModal({
 }
 
 // ── DARK TIMELINE HELPERS ──────────────────────────────────────────────────────
-// Note: These are intentionally kept separate — they use a dark theme
-// (white/transparent colors) that doesn't match the reusable light InputField.
 
 const DarkTimelineLabel = ({ isActive, label }) => (
   <div className="flex gap-4">
@@ -1324,55 +1377,61 @@ const DeploymentInfoTab = ({
   handleComboboxChange,
   openReplacementModal,
   openReplacementHistory,
+  replacementCount,
 }) => {
   const { settings } = useSettingsContext();
 
+  // ── Derive active IDs from the replacements array (latest-first) ─────────────
+  // In edit mode, a pending `editForm.replacement` selection takes priority,
+  // then falls back to the latest entry in the `replacements` array.
+  const latestReplacementTruck = getActiveReplacementTruck(
+    editForm?.replacements,
+  );
+  const latestReplacementDriver = getActiveReplacementDriver(
+    editForm?.replacements,
+  );
+  const latestReplacementTruckType = getActiveReplacementTruckType(
+    editForm?.replacements,
+  );
+
   const activeTruckId = isReplacementShow
-    ? typeof editForm?.replacement?.replacementTruckId === "object"
-      ? editForm?.replacement?.replacementTruckId?._id
-      : editForm?.replacement?.replacementTruckId
-    : typeof editForm?.truckId === "object"
-      ? editForm?.truckId?._id
-      : editForm?.truckId;
+    ? extractId(editForm?.replacement?.replacementTruckId) ||
+      extractId(latestReplacementTruck)
+    : extractId(editForm?.truckId);
 
   const activeDriverId = isReplacementShow
-    ? typeof editForm?.replacement?.replacementDriverId === "object"
-      ? editForm?.replacement?.replacementDriverId?._id
-      : editForm?.replacement?.replacementDriverId
-    : typeof editForm?.driverId === "object"
-      ? editForm?.driverId?._id
-      : editForm?.driverId;
+    ? extractId(editForm?.replacement?.replacementDriverId) ||
+      extractId(latestReplacementDriver)
+    : extractId(editForm?.driverId);
+
+  // Truck type: prefer pending edit, then latest replacement entry, then original
+  const activeTruckType = isReplacementShow
+    ? editForm?.replacement?.replacementTruckType ||
+      latestReplacementTruckType ||
+      editForm?.truckType
+    : editForm?.truckType;
 
   return (
     <div className="space-y-5">
       {/* ── Truck & Driver ── */}
       <div className="space-y-2">
-        <div className="relative flex justify-between">
+        <div className="relative flex justify-between items-center">
           <h3 className="text-xxxs md:text-xxs font-semibold text-gray-600 uppercase tracking-wider">
             Truck & Driver Details
           </h3>
-          <div className="flex items-center gap-2">
-            {isReplacementShow && (
-              <p className="text-xxs max-sm:text-xxxs text-red-500 font-medium">
-                *Truck replaced.{" "}
-                <span
-                  className="underline cursor-pointer"
-                  onClick={openReplacementHistory}
-                >
-                  Click to view
-                </span>
-              </p>
-            )}
-            {isEditMode && !isReplacementShow && (
-              <button
-                type="button"
-                onClick={openReplacementModal}
-                className="flex items-center gap-1.5 text-xxxs md:text-xxs font-semibold text-emerald-600 hover:text-emerald-700 disabled:text-gray-300 disabled:cursor-not-allowed transition-colors cursor-pointer"
-              >
-                <TbExchange className="text-xxs md:text-xs" /> Replace Truck
-              </button>
-            )}
-          </div>
+
+          {isReplacementShow && (
+            <button
+              type="button"
+              onClick={openReplacementHistory}
+              className="flex items-center gap-1.5 text-xxs max-sm:text-xxxs text-red-500 font-medium px-2.5 cursor-pointer"
+            >
+              {replacementCount} replacement{replacementCount !== 1 ? "s" : ""}
+              <span className="underline underline-offset-2">
+                · View history
+              </span>
+            </button>
+          )}
         </div>
 
         <div className="grid grid-cols-1 xs:grid-cols-2 gap-x-4 gap-y-4 max-sm:gap-x-3 max-sm:gap-y-3 border border-gray-200 rounded-md p-5 max-sm:p-4">
@@ -1410,11 +1469,7 @@ const DeploymentInfoTab = ({
                   ? "replacement.replacementTruckType"
                   : "truckType"
               }
-              value={
-                isReplacementShow
-                  ? editForm?.replacement?.replacementTruckType
-                  : editForm?.truckType
-              }
+              value={activeTruckType}
               onChange={handleChange}
               disabled={!isEditMode}
             >
