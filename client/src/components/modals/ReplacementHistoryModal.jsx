@@ -198,7 +198,7 @@ function OriginalEntry({ deployment }) {
 
           {/* Card body */}
           <div className="p-4 max-sm:p-3">
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-green-50">
               <StaticField
                 label="Plate No."
                 value={deployment?.truckId?.plateNo}

@@ -219,7 +219,7 @@ const deploymentSchema = new mongoose.Schema(
           type: String,
           trim: true,
           match: [
-            /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?)?$/,
+            /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})?)?)?$/,
             "Invalid replacedAt time format",
           ],
         },

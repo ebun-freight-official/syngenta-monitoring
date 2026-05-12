@@ -584,7 +584,7 @@ function Deployments() {
                       <BiExport className="text-sm sm:text-base" />
                       <span className="text-xs sm:text-sm">Export</span>
                       {selectedIds.size > 0 && (
-                        <span className="absolute -top-1.5 -right-1.5 bg-blue-600 text-white text-xxs font-semibold min-w-[18px] h-[18px] flex items-center justify-center px-1 rounded-full leading-none">
+                        <span className="absolute -top-1.5 -right-1.5 bg-blue-600 text-white text-xxs font-semibold min-w-4.5 h-4.5 flex items-center justify-center px-1 rounded-full leading-none">
                           {selectedIds.size}
                         </span>
                       )}
@@ -794,7 +794,7 @@ function Deployments() {
                     <BiExport className="text-base" />
                     <span>Export</span>
                     {selectedIds.size > 0 && (
-                      <span className="absolute -top-1.5 -right-1.5 bg-blue-600 text-white text-xs font-bold min-w-[18px] h-[18px] flex items-center justify-center px-1 rounded-full leading-none">
+                      <span className="absolute -top-1.5 -right-1.5 bg-blue-600 text-white text-xs font-bold min-w-4.5 h-4.5 flex items-center justify-center px-1 rounded-full leading-none">
                         {selectedIds.size}
                       </span>
                     )}
@@ -831,7 +831,7 @@ function Deployments() {
         ) : (
           <div className="relative flex-1 overflow-y-auto scrollbar-thin bg-white">
             <div className="absolute inset-0">
-              <table className="table text-xs sm:table-sm table-pin-rows table-pin-cols">
+              <table className="table text-xs sm:table-sm table-pin-rows table-pin-cols border-collapse">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 max-md:text-xxs text-xs uppercase tracking-wide">
                     {["head_admin", "admin"].includes(userData.data.role) && (

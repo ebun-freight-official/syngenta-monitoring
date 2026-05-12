@@ -745,20 +745,40 @@ const updateDeployment = async (req, res, next) => {
 
       // ── Single combined push ──────────────────────────────────────────────
       if (isNewTruckReplacement || isNewDriverReplacement) {
-        const newEntry = {
-          replacedAt: replacement.replacedAt || new Date().toISOString(),
-          reason: replacement.reason,
-          remarks: replacement.remarks,
-        };
-        if (isNewTruckReplacement) {
-          newEntry.replacementTruckId = replacementTruckId;
-          newEntry.replacementTruckType =
-            replacement.replacementTruckType || existingDeployment.truckType;
+        const lastIndex = existingDeployment.replacements.length - 1;
+
+        if (lastIndex >= 0 && !replacement.isNewReplacement) {
+          // Edit latest in-place (from DeploymentDetailsModal)
+          if (isNewTruckReplacement) {
+            existingDeployment.replacements[lastIndex].replacementTruckId =
+              replacementTruckId;
+            existingDeployment.replacements[lastIndex].replacementTruckType =
+              replacement.replacementTruckType || existingDeployment.truckType;
+          }
+          if (isNewDriverReplacement) {
+            existingDeployment.replacements[lastIndex].replacementDriverId =
+              replacementDriverId;
+          }
+        } else {
+          // Push new entry (from ReplacementModal or first ever replacement)
+          const newEntry = {
+            replacedAt: (
+              replacement.replacedAt || new Date().toISOString()
+            ).substring(0, 16),
+            reason: replacement.reason,
+            remarks: replacement.remarks,
+          };
+          if (isNewTruckReplacement) {
+            newEntry.replacementTruckId = replacementTruckId;
+            newEntry.replacementTruckType =
+              replacement.replacementTruckType || existingDeployment.truckType;
+          }
+          if (isNewDriverReplacement) {
+            newEntry.replacementDriverId = replacementDriverId;
+          }
+          existingDeployment.replacements.push(newEntry);
         }
-        if (isNewDriverReplacement) {
-          newEntry.replacementDriverId = replacementDriverId;
-        }
-        existingDeployment.replacements.push(newEntry);
+
         existingDeployment.markModified("replacements");
       }
     }

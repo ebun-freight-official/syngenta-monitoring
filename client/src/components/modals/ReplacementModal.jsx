@@ -87,6 +87,7 @@ function ReplacementModal({
     e.preventDefault();
 
     const replacement = {
+      isNewReplacement: true,
       replacementTruckId: formData.truckId,
       replacementDriverId: formData.driverId,
       replacementTruckType: formData.truckType,
