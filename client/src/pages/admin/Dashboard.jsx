@@ -1191,7 +1191,9 @@ const Dashboard = () => {
     className = "",
     children,
   }) => (
-    <div className={`overflow-x-auto -mx-4 sm:mx-0 ${className}`}>
+    <div
+      className={`overflow-x-auto -mx-4 sm:mx-0 ${className} scrollbar-thin`}
+    >
       <div style={{ minWidth }} className="px-4 sm:px-0">
         <div className={heightClass}>{children}</div>
       </div>

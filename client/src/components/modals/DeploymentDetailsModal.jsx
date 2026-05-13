@@ -370,7 +370,7 @@ function DeploymentDetailsModal({
                 "font-poppins text-gray-900 w-full max-w-6xl rounded-xl bg-white shadow-lg overflow-hidden flex flex-col lg:flex-row",
                 ["head_admin", "admin"].includes(userData.data.role)
                   ? "h-[80vh] xs:h-[64vh] sm:h-[69vh] md:h-[72vh]"
-                  : "h-[80vh] xs:h-[56vh] sm:h-[62.5vh] md:h-[65.5vh]",
+                  : "h-[80vh] xs:h-[56vh] sm:h-[62.5vh] md:h-[67vh]",
               )}
             >
               {/* ══ LEFT PANEL ══════════════════════════════════════════════════ */}
