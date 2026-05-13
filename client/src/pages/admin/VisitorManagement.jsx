@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { FaFilter, FaSearch } from "react-icons/fa";
+import { FaFilter, FaPlus, FaSearch } from "react-icons/fa";
 import { IoClose } from "react-icons/io5";
 import {
   MdOutlineKeyboardArrowLeft,
@@ -20,6 +20,7 @@ import PageHeader from "../../components/PageHeader";
 import { getAvatarColor } from "../../utils/avatarColors";
 import FilterDropdown from "../../components/ui/FilterDropdown";
 import { SelectFilter } from "../../components/ui/FilterFields";
+import CreateVisitorModal from "../../components/modals/CreateVisitorModal";
 
 const defaultFilters = {
   role: "visitor",
@@ -73,9 +74,12 @@ function UserAvatar({ user, size = "sm" }) {
 
 function VisitorManagement() {
   const { userData } = useUserContext();
+
   const [isVisitorDetailsModalOpen, setIsVisitorDetailsModalOpen] =
     useState(false);
   const [isDeleteVisitorModalOpen, setIsDeleteVisitorModalOpen] =
+    useState(false);
+  const [isCreateVisitorModalOpen, setIsCreateVisitorModalOpen] =
     useState(false);
 
   const { getAllUserFunction, isLoading } = useGetAllUser();
@@ -151,6 +155,10 @@ function VisitorManagement() {
     setIsVisitorDetailsModalOpen(false);
   };
 
+  const handleAddNewVisitor = (newVisitor) => {
+    setAllVisitors((prev) => [newVisitor, ...prev]);
+  };
+
   useEffect(() => {
     const handleGetAllUsers = async () => {
       const { users, total, page, totalPages, error } =
@@ -183,6 +191,20 @@ function VisitorManagement() {
               header={" Manage Visitors"}
               subheader={"View and manage all visitors in the system"}
             />
+
+            <div className="flex gap-2 xl:hidden">
+              <button
+                onClick={() => setIsCreateVisitorModalOpen(true)}
+                disabled={isLoading}
+                className={clsx(
+                  btnBase,
+                  "bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-100",
+                )}
+              >
+                <FaPlus className="text-xs" />
+                <span className="text-xs sm:text-sm">Create New</span>
+              </button>
+            </div>
           </div>
 
           <div className="flex flex-wrap justify-between gap-2 w-full xl:w-auto">
@@ -273,6 +295,19 @@ function VisitorManagement() {
                   <MdOutlineKeyboardArrowRight />
                 </button>
               </div>
+
+              {/* xl Create */}
+              <button
+                onClick={() => setIsCreateVisitorModalOpen(true)}
+                disabled={isLoading}
+                className={clsx(
+                  btnBase,
+                  "bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-100 max-xl:hidden",
+                )}
+              >
+                <FaPlus className="text-xs" />
+                <span>Create New</span>
+              </button>
             </div>
           </div>
         </div>
@@ -362,6 +397,11 @@ function VisitorManagement() {
         onUpdate={handleUpdateAllUsers}
         openDeleteModal={() => setIsDeleteVisitorModalOpen(true)}
         currentUser={userData.data}
+      />
+      <CreateVisitorModal
+        isOpen={isCreateVisitorModalOpen}
+        onClose={() => setIsCreateVisitorModalOpen(false)}
+        onCreate={handleAddNewVisitor}
       />
       <DeleteUserModal
         isOpen={isDeleteVisitorModalOpen}

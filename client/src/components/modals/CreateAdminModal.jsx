@@ -22,7 +22,7 @@ const DotPattern = () => (
   >
     <defs>
       <pattern
-        id="dots-create-admin"
+        id="dots-create-user"
         x="0"
         y="0"
         width="20"
@@ -32,7 +32,7 @@ const DotPattern = () => (
         <circle cx="2" cy="2" r="1.5" fill="white" />
       </pattern>
     </defs>
-    <rect width="100%" height="100%" fill="url(#dots-create-admin)" />
+    <rect width="100%" height="100%" fill="url(#dots-create-user)" />
   </svg>
 );
 

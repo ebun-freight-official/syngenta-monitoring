@@ -17,7 +17,7 @@ import { no_image } from "../../consts/images";
 import clsx from "clsx";
 import { DateTime } from "luxon";
 import { MdKeyboardArrowDown } from "react-icons/md";
-import { USER_STATUS_TYPES } from "../../utils/userOptions";
+import { COMPANY_OPTIONS, USER_STATUS_TYPES } from "../../utils/userOptions";
 import { toast } from "react-toastify";
 import { RiFolderUploadLine } from "react-icons/ri";
 import { useSettingsContext } from "../../contexts/SettingsContext";
@@ -29,6 +29,8 @@ import {
   RiCheckLine,
 } from "react-icons/ri";
 import ActionButton from "../ui/ActionButton";
+import SelectField from "../ui/SelectField";
+import InputField from "../ui/InputField";
 
 /* ─── DotPattern component ───────────────────────────────────────────────── */
 const DotPattern = () => (
@@ -359,164 +361,262 @@ function UserDetailsModal({
                   className="flex-1 flex flex-col"
                 >
                   <div className="flex-1 px-6 py-5 max-md:px-4 max-md:pt-4 grid grid-cols-2 gap-x-4 gap-y-4 max-md:gap-x-3 max-md:gap-y-3 content-start">
-                    <InputField
-                      label="First Name"
-                      type="text"
-                      name="firstname"
-                      placeholder="First name"
-                      value={editForm?.firstname || ""}
-                      disabled={!isEditMode || isLoading}
-                      onChange={handleChange}
-                    />
-                    <InputField
-                      label="Last Name"
-                      type="text"
-                      name="lastname"
-                      placeholder="Last name"
-                      value={editForm?.lastname || ""}
-                      disabled={!isEditMode || isLoading}
-                      onChange={handleChange}
-                    />
-                    <InputField
-                      label="Email"
-                      type="email"
-                      name="email"
-                      placeholder="Email address"
-                      value={editForm?.email || ""}
-                      disabled={!isEditMode || isLoading}
-                      onChange={handleChange}
-                      isCapitalize={false}
-                    />
-                    <InputField
-                      label="Phone No."
-                      type="tel"
-                      name="phoneNo"
-                      placeholder="Phone No."
-                      value={editForm?.phoneNo || ""}
-                      disabled={!isEditMode || isLoading}
-                      onChange={handleChange}
-                    />
+                    {/* visitor view */}
+                    {["visitor"].includes(editForm?.role) && (
+                      <>
+                        <InputField
+                          label="First Name"
+                          type="text"
+                          name="firstname"
+                          placeholder="First name"
+                          value={editForm?.firstname || ""}
+                          disabled={!isEditMode || isLoading}
+                          onChange={handleChange}
+                        />
 
-                    {/* Subcon combobox (only when role === 'subcon') */}
-                    {editForm?.role === "subcon" ? (
-                      <div className="flex flex-col gap-1.5">
-                        <span className="text-xxxs md:text-xxs font-semibold text-gray-600 uppercase tracking-wider">
-                          Subcon
-                        </span>
-                        {isEditMode ? (
-                          <Combobox
-                            value={editForm?.subcon || ""}
-                            onChange={(v) => handleComboboxChange("subcon", v)}
-                          >
-                            <div className="relative flex items-center bg-white border border-gray-200 rounded-md px-4 py-3 max-md:px-3 max-md:py-2.5 focus-within:border-gray-400 transition-all">
-                              <ComboboxInput
-                                className="w-full bg-transparent text-xs max-md:text-xxs text-gray-800 placeholder-gray-400 focus:outline-none capitalize min-w-0"
-                                displayValue={(v) => v || ""}
-                                onChange={(e) => setSubconQuery(e.target.value)}
-                                placeholder="Search subcon..."
-                                autoComplete="off"
-                              />
-                              <ComboboxButton className="absolute right-4 max-md:right-3 text-gray-400">
-                                <MdKeyboardArrowDown className="text-base" />
-                              </ComboboxButton>
-                            </div>
-                            <ComboboxOptions
-                              portal
-                              anchor={{ to: "bottom start", gap: 8 }}
-                              className="z-999 max-h-48 w-(--input-width) overflow-auto rounded-md bg-white border border-gray-200 py-1 text-xs focus:outline-none"
-                            >
-                              {filteredSubcons.length === 0 ? (
-                                <div className="px-4 py-2 text-gray-400 italic">
-                                  Nothing found.
-                                </div>
-                              ) : (
-                                filteredSubcons.map((subcon, i) => (
-                                  <ComboboxOption
-                                    key={i}
-                                    value={subcon}
-                                    className={({ focus }) =>
-                                      clsx(
-                                        "px-4 py-2 cursor-default select-none capitalize transition-colors",
-                                        {
-                                          "bg-gray-50": focus,
-                                          "bg-gray-100 font-medium":
-                                            editForm?.subcon === subcon,
-                                        },
-                                      )
-                                    }
-                                  >
-                                    {subcon}
-                                  </ComboboxOption>
-                                ))
-                              )}
-                            </ComboboxOptions>
-                          </Combobox>
-                        ) : (
-                          <div className="flex items-center bg-gray-50 border border-gray-200 rounded-md px-4 py-3 max-md:px-3 max-md:py-2.5">
-                            <p className="text-xs max-md:text-xxs text-gray-700 capitalize truncate">
-                              {editForm?.subcon?.replace(/_/g, " ") ||
-                                "Not assigned"}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="flex flex-col gap-1.5">
-                        <span className="text-xxxs md:text-xxs font-semibold text-gray-600 uppercase tracking-wider">
-                          Role
-                        </span>
-                        {isEditMode && isAdminTarget ? (
-                          <div className="relative flex items-center bg-white border border-gray-200 rounded-md px-4 py-3 max-md:px-3 max-md:py-2.5 focus-within:border-gray-400 transition-all">
-                            <select
-                              name="role"
-                              value={editForm?.role || ""}
-                              onChange={handleChange}
-                              className="w-full appearance-none bg-transparent text-xs max-md:text-xxs text-gray-800 focus:outline-none capitalize"
-                            >
-                              <option value="admin">Admin</option>
-                              <option value="head_admin">Head Admin</option>
-                            </select>
-                            <MdKeyboardArrowDown className="absolute right-4 max-md:right-3 text-gray-400 text-base pointer-events-none" />
-                          </div>
-                        ) : (
-                          <div className="flex items-center bg-gray-50 border border-gray-200 rounded-md px-4 py-3 max-md:px-3 max-md:py-2.5">
-                            <p className="text-xs max-md:text-xxs text-gray-500 capitalize">
-                              {editForm?.role?.replace(/_/g, " ") || "—"}
-                            </p>
-                          </div>
-                        )}
-                      </div>
+                        <InputField
+                          label="Last Name"
+                          type="text"
+                          name="lastname"
+                          placeholder="Last name"
+                          value={editForm?.lastname || ""}
+                          disabled={!isEditMode || isLoading}
+                          onChange={handleChange}
+                        />
+
+                        <InputField
+                          label="Email"
+                          type="email"
+                          name="email"
+                          placeholder="Email address"
+                          value={editForm?.email || ""}
+                          disabled={!isEditMode || isLoading}
+                          onChange={handleChange}
+                          isCapitalize={false}
+                        />
+
+                        <SelectField
+                          label="Company"
+                          name="company"
+                          value={editForm?.company || ""}
+                          onChange={handleChange}
+                          disabled={!isEditMode || isLoading}
+                        >
+                          <option value="" disabled>
+                            Select company
+                          </option>
+                          {COMPANY_OPTIONS.map((item, i) => (
+                            <option key={i} value={item.toLowerCase()}>
+                              {item}
+                            </option>
+                          ))}
+                        </SelectField>
+
+                        <SelectField
+                          label="Role"
+                          name="role"
+                          value={editForm?.role || ""}
+                          onChange={handleChange}
+                          disabled={!isEditMode || isLoading || !isAdminTarget}
+                        >
+                          <option value="admin">Admin</option>
+                          <option value="head_admin">Head Admin</option>
+                        </SelectField>
+
+                        <SelectField
+                          label="Status"
+                          name="status"
+                          value={editForm?.status || ""}
+                          onChange={handleChange}
+                          disabled={!isEditMode || isLoading}
+                        >
+                          <option value="" disabled>
+                            Select status
+                          </option>
+                          {USER_STATUS_TYPES.map((s, i) => (
+                            <option key={i} value={s.value}>
+                              {s.label}
+                            </option>
+                          ))}
+                        </SelectField>
+                      </>
                     )}
 
-                    {/* Status */}
-                    <div className="flex flex-col gap-1.5">
-                      <span className="text-xxxs md:text-xxs font-semibold text-gray-600 uppercase tracking-wider">
-                        Status
-                      </span>
-                      {isEditMode ? (
-                        <div className="relative flex items-center bg-white border border-gray-200 rounded-md px-4 py-3 max-md:px-3 max-md:py-2.5 focus-within:border-gray-400 transition-all">
-                          <select
+                    {/* subcon view */}
+                    {["subcon"].includes(editForm?.role) && (
+                      <>
+                        <InputField
+                          label="First Name"
+                          type="text"
+                          name="firstname"
+                          placeholder="First name"
+                          value={editForm?.firstname || ""}
+                          disabled={!isEditMode || isLoading}
+                          onChange={handleChange}
+                        />
+
+                        <InputField
+                          label="Last Name"
+                          type="text"
+                          name="lastname"
+                          placeholder="Last name"
+                          value={editForm?.lastname || ""}
+                          disabled={!isEditMode || isLoading}
+                          onChange={handleChange}
+                        />
+
+                        <InputField
+                          label="Email"
+                          type="email"
+                          name="email"
+                          placeholder="Email address"
+                          value={editForm?.email || ""}
+                          disabled={!isEditMode || isLoading}
+                          onChange={handleChange}
+                          isCapitalize={false}
+                        />
+
+                        <InputField
+                          label="Phone No."
+                          type="tel"
+                          name="phoneNo"
+                          placeholder="Phone No."
+                          value={editForm?.phoneNo || ""}
+                          disabled={!isEditMode || isLoading}
+                          onChange={handleChange}
+                        />
+
+                        <SelectField
+                          label="Subcon"
+                          name="subcon"
+                          value={editForm?.subcon || ""}
+                          onChange={(e) =>
+                            handleComboboxChange("subcon", e.target.value)
+                          }
+                          disabled={!isEditMode || isLoading}
+                        >
+                          <option value="" disabled>
+                            Select subcon
+                          </option>
+                          {settings.trucksDrivers.subcon.map((subcon, i) => (
+                            <option key={i} value={subcon}>
+                              {subcon}
+                            </option>
+                          ))}
+                        </SelectField>
+
+                        <SelectField
+                          label="Status"
+                          name="status"
+                          value={editForm?.status || ""}
+                          onChange={handleChange}
+                          disabled={!isEditMode || isLoading}
+                        >
+                          <option value="" disabled>
+                            Select status
+                          </option>
+                          {USER_STATUS_TYPES.map((s, i) => (
+                            <option key={i} value={s.value}>
+                              {s.label}
+                            </option>
+                          ))}
+                        </SelectField>
+                      </>
+                    )}
+
+                    {["head_admin", "admin"].includes(editForm?.role) && (
+                      <>
+                        <InputField
+                          label="First Name"
+                          type="text"
+                          name="firstname"
+                          placeholder="First name"
+                          value={editForm?.firstname || ""}
+                          disabled={!isEditMode || isLoading}
+                          onChange={handleChange}
+                        />
+
+                        <InputField
+                          label="Last Name"
+                          type="text"
+                          name="lastname"
+                          placeholder="Last name"
+                          value={editForm?.lastname || ""}
+                          disabled={!isEditMode || isLoading}
+                          onChange={handleChange}
+                        />
+
+                        <InputField
+                          label="Email"
+                          type="email"
+                          name="email"
+                          placeholder="Email address"
+                          value={editForm?.email || ""}
+                          disabled={!isEditMode || isLoading}
+                          onChange={handleChange}
+                          isCapitalize={false}
+                        />
+
+                        <InputField
+                          label="Phone No."
+                          type="tel"
+                          name="phoneNo"
+                          placeholder="Phone No."
+                          value={editForm?.phoneNo || ""}
+                          disabled={!isEditMode || isLoading}
+                          onChange={handleChange}
+                        />
+
+                        <div className="col-span-full grid grid-cols-3 gap-x-4 gap-y-4 max-md:gap-x-3 max-md:gap-y-3">
+                          <SelectField
+                            label="Role"
+                            name="role"
+                            value={editForm?.role || ""}
+                            onChange={handleChange}
+                            disabled={
+                              !isEditMode || isLoading || !isAdminTarget
+                            }
+                          >
+                            <option value="admin">Admin</option>
+                            <option value="head_admin">Head Admin</option>
+                          </SelectField>
+
+                          <SelectField
+                            label="Status"
                             name="status"
                             value={editForm?.status || ""}
                             onChange={handleChange}
-                            className="w-full appearance-none bg-transparent text-xs max-md:text-xxs text-gray-800 focus:outline-none capitalize"
+                            disabled={!isEditMode || isLoading}
                           >
+                            <option value="" disabled>
+                              Select status
+                            </option>
                             {USER_STATUS_TYPES.map((s, i) => (
                               <option key={i} value={s.value}>
                                 {s.label}
                               </option>
                             ))}
-                          </select>
-                          <MdKeyboardArrowDown className="absolute right-4 max-md:right-3 text-gray-400 text-base pointer-events-none" />
+                          </SelectField>
+
+                          <SelectField
+                            label="Company"
+                            name="company"
+                            value={editForm?.company || ""}
+                            onChange={handleChange}
+                            disabled={!isEditMode || isLoading}
+                          >
+                            <option value="" disabled>
+                              Select company
+                            </option>
+                            {COMPANY_OPTIONS.map((item, i) => (
+                              <option key={i} value={item.toLowerCase()}>
+                                {item}
+                              </option>
+                            ))}
+                          </SelectField>
                         </div>
-                      ) : (
-                        <div className="flex items-center bg-gray-50 border border-gray-200 rounded-md px-4 py-3 max-md:px-3 max-md:py-2.5">
-                          <p className="text-xs max-md:text-xxs text-gray-500 capitalize">
-                            {editForm?.status}
-                          </p>
-                        </div>
-                      )}
-                    </div>
+                      </>
+                    )}
 
                     {/* Password fields */}
                     <div
@@ -602,49 +702,5 @@ function UserDetailsModal({
     </Transition>
   );
 }
-
-/* ─── Reusable InputField ───────────────────────────────────────────────── */
-const InputField = ({
-  label,
-  type,
-  name,
-  placeholder,
-  value,
-  onChange,
-  disabled,
-  isRequired = true,
-  isCapitalize = true,
-}) => (
-  <label className="flex flex-col gap-1.5">
-    <span className="text-xxxs md:text-xxs font-semibold text-gray-600 uppercase tracking-wider">
-      {label} {isRequired && <span className="text-red-400">*</span>}
-    </span>
-    <div
-      className={clsx(
-        "flex items-center border rounded-md px-4 py-3 max-md:px-3 max-md:py-2.5 transition-all duration-200",
-        disabled
-          ? "bg-gray-50 border-gray-200"
-          : "bg-white border-gray-200 focus-within:border-gray-400",
-      )}
-    >
-      <input
-        type={type}
-        name={name}
-        placeholder={placeholder}
-        value={value}
-        minLength={2}
-        maxLength={50}
-        onChange={onChange}
-        disabled={disabled}
-        required={isRequired}
-        className={clsx(
-          "flex-1 text-xs max-md:text-xxs placeholder-gray-400 bg-transparent focus:outline-none min-w-0",
-          disabled ? "text-gray-500" : "text-gray-800",
-          { capitalize: isCapitalize },
-        )}
-      />
-    </div>
-  </label>
-);
 
 export default UserDetailsModal;

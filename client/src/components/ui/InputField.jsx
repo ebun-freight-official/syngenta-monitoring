@@ -28,7 +28,8 @@ const InputField = ({
   );
 
   const inputClass = clsx(
-    "flex-1 min-w-0 text-xs max-sm:text-xxs bg-transparent placeholder-gray-400 focus:outline-none capitalize truncate",
+    "flex-1 min-w-0 text-xs max-sm:text-xxs bg-transparent placeholder-gray-400 focus:outline-none truncate",
+    type !== "email" && "capitalize",
     disabled ? "text-gray-500" : "text-gray-800",
   );
 

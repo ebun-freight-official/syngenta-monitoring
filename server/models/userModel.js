@@ -29,7 +29,6 @@ const userSchema = new mongoose.Schema(
     },
     phoneNo: {
       type: String,
-      required: [true, "Phone number is required"],
       trim: true,
       match: [/^(?:\+639|09)\d{9}$/, "Invalid phone number format"],
     },
@@ -47,6 +46,13 @@ const userSchema = new mongoose.Schema(
         values: ["head_admin", "admin", "visitor", "subcon"],
         message: "{VALUE} is not a valid role",
       },
+    },
+    company: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: null,
+      maxlength: [100, "Company name cannot exceed 100 characters"],
     },
     status: {
       type: String,

@@ -1,45 +1,41 @@
-const express = require('express')
-const { upload } = require('../middlewares/multerCloudinary')
-const authenticateToken = require('../middlewares/auth')
+const express = require("express");
+const { upload } = require("../middlewares/multerCloudinary");
+const authenticateToken = require("../middlewares/auth");
 const {
   loginUser,
   logoutUser,
-  createUser,
   getCurrentUser,
   getAllUsers,
   updateUser,
-  createAdmin,
+  createUser,
   hardDeleteUser,
   softDeleteUser,
-  restoreUser
-} = require('../controllers/userController')
+  restoreUser,
+} = require("../controllers/userController");
 
-const router = express.Router()
+const router = express.Router();
 
-router.post('/login', loginUser)
-router.post('/logout', authenticateToken, logoutUser)
+router.post("/login", loginUser);
+router.post("/logout", authenticateToken, logoutUser);
 
-router
-  .route('/')
-  .get(authenticateToken, getAllUsers)
-  .post(upload.single('image'), createUser)
+router.route("/").get(authenticateToken, getAllUsers);
 
 router.post(
-  '/create-admin',
+  "/create-user",
   authenticateToken,
-  upload.single('image'),
-  createAdmin
-)
+  upload.single("image"),
+  createUser,
+);
 
-router.get('/current-user', authenticateToken, getCurrentUser)
+router.get("/current-user", authenticateToken, getCurrentUser);
 
 router
-  .route('/:id')
-  .patch(authenticateToken, upload.single('image'), updateUser)
+  .route("/:id")
+  .patch(authenticateToken, upload.single("image"), updateUser);
 
 // delete routes
-router.delete('/hard-delete/:id', authenticateToken, hardDeleteUser)
-router.delete('/soft-delete/:id', authenticateToken, softDeleteUser)
-router.patch('/restore/:id', authenticateToken, restoreUser)
+router.delete("/hard-delete/:id", authenticateToken, hardDeleteUser);
+router.delete("/soft-delete/:id", authenticateToken, softDeleteUser);
+router.patch("/restore/:id", authenticateToken, restoreUser);
 
-module.exports = router
+module.exports = router;
