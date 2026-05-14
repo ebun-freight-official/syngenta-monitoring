@@ -177,7 +177,7 @@ function ActivityLogsPage() {
       ) : (
         <div className="relative flex-1 overflow-y-auto scrollbar-thin bg-white">
           <div className="absolute inset-0">
-            <table className="table text-xs sm:table-sm table-pin-rows table-pin-cols">
+            <table className="table text-xs sm:table-sm table-pin-rows table-pin-cols border-collapse">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 max-md:text-xxs text-xs uppercase tracking-wide">
                   <td>{total}</td>

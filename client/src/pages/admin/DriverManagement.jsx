@@ -196,8 +196,8 @@ function DriverManagement() {
               subheader={"View and manage all drivers in the system"}
             />
 
-            <div className="flex gap-2 xl:hidden">
-              {["head_admin", "admin"].includes(userData.data.role) && (
+            {["head_admin"].includes(userData.data.role) && (
+              <div className="flex gap-2 xl:hidden">
                 <button
                   onClick={() => setIsCreateDriverModalOpen(true)}
                   disabled={isLoading}
@@ -209,8 +209,8 @@ function DriverManagement() {
                   <FaPlus className="text-xs" />
                   <span className="text-xs sm:text-sm">Create New</span>
                 </button>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           <div className="flex flex-wrap justify-between gap-2 w-full xl:w-auto">
@@ -327,7 +327,7 @@ function DriverManagement() {
               </div>
 
               {/* xl Create */}
-              {["head_admin", "admin"].includes(userData.data.role) && (
+              {["head_admin"].includes(userData.data.role) && (
                 <button
                   onClick={() => setIsCreateDriverModalOpen(true)}
                   disabled={isLoading}
@@ -354,7 +354,7 @@ function DriverManagement() {
         ) : (
           <div className="relative flex-1 overflow-y-auto scrollbar-thin bg-white">
             <div className="absolute inset-0">
-              <table className="table text-xs sm:table-sm table-pin-rows table-pin-cols">
+              <table className="table text-xs sm:table-sm table-pin-rows table-pin-cols border-collapse">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 max-md:text-xxs text-xs uppercase tracking-wide">
                     <td>{total}</td>

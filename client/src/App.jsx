@@ -11,7 +11,6 @@ import UserLayout from "./layout/UserLayout";
 import ViewerListPage from "./pages/admin/VisitorManagement";
 import AdminManagement from "./pages/admin/AdminManagement";
 import LoginPage from "./pages/public/LoginPage";
-import SignupPage from "./pages/public/SignupPage";
 import TimelineLogs from "./pages/admin/TimelineLogs";
 import MyProfile from "./pages/admin/MyProfile";
 import SubconManagement from "./pages/admin/SubconManagement";
@@ -74,7 +73,6 @@ function App() {
 
       <Routes>
         <Route path="/" element={<LoginPage />} />
-        <Route path="/signup" element={<SignupPage />} />
 
         {/* admin page */}
         <Route
@@ -86,7 +84,8 @@ function App() {
                 </UserProvider>
               </SettingsProvider>
             </UIProvider>
-          }>
+          }
+        >
           <Route path="/secure/my-profile" element={<MyProfile />} />
 
           <Route path="/secure/dashboard" element={<Dashboard />} />

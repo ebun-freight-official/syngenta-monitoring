@@ -135,6 +135,9 @@ const createDeployment = async (req, res, next) => {
       return next(createError(403, "Access denied"));
     }
 
+    const company =
+      req.user.role === "head_admin" ? req.body.company : req.user.company;
+
     validateFields({
       truckId,
       driverId,
@@ -143,6 +146,7 @@ const createDeployment = async (req, res, next) => {
       destination,
       receivingContactPerson,
       receivingContactPersonNo,
+      company,
     });
 
     if (!pickups || !Array.isArray(pickups) || pickups.length === 0) {
@@ -176,13 +180,13 @@ const createDeployment = async (req, res, next) => {
 
     const truck = await Truck.findById(truckId);
     if (!truck) return next(createError(404, "Truck not found"));
-    if (truck.status === "deployed")
-      return next(createError(400, "Truck is already deployed"));
+    // if (truck.status === "deployed")
+    //   return next(createError(400, "Truck is already deployed"));
 
     const driver = await Driver.findById(driverId);
     if (!driver) return next(createError(404, "Driver not found"));
-    if (driver.status === "deployed")
-      return next(createError(400, "Driver is already deployed"));
+    // if (driver.status === "deployed")
+    //   return next(createError(400, "Driver is already deployed"));
 
     const newDeployment = await Deployment.create({
       pickups: pickups.map(mapPickup),
@@ -201,6 +205,7 @@ const createDeployment = async (req, res, next) => {
       isTMOPrinted,
       isSoftDeleted: false,
       replacements: [],
+      company,
     });
 
     await Promise.all([

@@ -13,7 +13,6 @@ import {
 import React, { useEffect, useState } from "react";
 import { IoClose } from "react-icons/io5";
 import clsx from "clsx";
-import { MdKeyboardArrowDown } from "react-icons/md";
 import { toast } from "react-toastify";
 import { RiFolderUploadLine } from "react-icons/ri";
 import { DateTime } from "luxon";
@@ -29,7 +28,10 @@ import {
   RiCheckLine,
 } from "react-icons/ri";
 import ActionButton from "../ui/ActionButton";
+import InputField from "../ui/InputField";
+import SelectField from "../ui/SelectField";
 import { getAvatarColor } from "../../utils/avatarColors";
+import { MdKeyboardArrowDown } from "react-icons/md";
 
 /* ─── DotPattern component ───────────────────────────────────────────────── */
 const DotPattern = () => (
@@ -139,8 +141,6 @@ function TruckDetailsModal({
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [isOpen]);
-
-  const isAdmin = ["head_admin", "admin"].includes(userData.data.role);
 
   // — same pattern as UserDetailsModal —
   const plateNo = truck?.plateNo ?? "";
@@ -333,105 +333,56 @@ function TruckDetailsModal({
                       placeholder="Plate No."
                       value={editForm?.plateNo || ""}
                       disabled={!isEditMode || isLoading}
-                      isUppercase
                       onChange={handleChange}
                     />
 
                     {/* Truck Type */}
-                    <div className="flex flex-col gap-1.5">
-                      <span className="text-xxxs md:text-xxs font-semibold text-gray-600 uppercase tracking-wider">
-                        Type <span className="text-red-400">*</span>
-                      </span>
-                      {isEditMode ? (
-                        <div className="relative flex items-center bg-white border border-gray-200 rounded-md px-4 py-3 max-md:px-3 max-md:py-2.5 focus-within:border-gray-400 transition-all">
-                          <select
-                            name="truckType"
-                            value={editForm?.truckType || ""}
-                            onChange={handleChange}
-                            className="w-full appearance-none bg-transparent text-xs max-md:text-xxs text-gray-800 focus:outline-none capitalize"
-                          >
-                            {settings.trucksDrivers.truckType.map((item, i) => (
-                              <option key={i} value={item}>
-                                {item}
-                              </option>
-                            ))}
-                          </select>
-                          <MdKeyboardArrowDown className="absolute right-4 max-md:right-3 text-gray-400 text-base pointer-events-none" />
-                        </div>
-                      ) : (
-                        <div className="flex items-center bg-gray-50 border border-gray-200 rounded-md px-4 py-3 max-md:px-3 max-md:py-2.5">
-                          <p className="text-xs max-md:text-xxs text-gray-500 capitalize">
-                            {editForm?.truckType || "—"}
-                          </p>
-                        </div>
-                      )}
-                    </div>
+                    <SelectField
+                      label="Type"
+                      name="truckType"
+                      value={editForm?.truckType || ""}
+                      onChange={handleChange}
+                      disabled={!isEditMode || isLoading}
+                      required={true}
+                    >
+                      {settings.trucksDrivers.truckType.map((item, i) => (
+                        <option key={i} value={item}>
+                          {item}
+                        </option>
+                      ))}
+                    </SelectField>
 
                     {/* Max Load */}
-                    <div className="flex flex-col gap-1.5">
-                      <span className="text-xxxs md:text-xxs font-semibold text-gray-600 uppercase tracking-wider">
-                        Max Load <span className="text-red-400">*</span>
-                      </span>
-                      {isEditMode ? (
-                        <div className="flex items-center bg-white border border-gray-200 rounded-md px-4 py-3 max-md:px-3 max-md:py-2.5 focus-within:border-gray-400 transition-all">
-                          <NumericFormat
-                            thousandSeparator
-                            decimalScale={0}
-                            allowNegative={false}
-                            value={editForm?.maxLoad || ""}
-                            onValueChange={(values) => {
-                              handleChange({
-                                target: {
-                                  name: "maxLoad",
-                                  value: values.floatValue || "",
-                                },
-                              });
-                            }}
-                            placeholder="Max Load"
-                            disabled={isLoading}
-                            className="flex-1 text-xs max-md:text-xxs text-gray-800 placeholder-gray-400 bg-transparent focus:outline-none min-w-0"
-                          />
-                        </div>
-                      ) : (
-                        <div className="flex items-center bg-gray-50 border border-gray-200 rounded-md px-4 py-3 max-md:px-3 max-md:py-2.5">
-                          <p className="text-xs max-md:text-xxs text-gray-500">
-                            {editForm?.maxLoad
-                              ? Number(editForm.maxLoad).toLocaleString()
-                              : "—"}
-                          </p>
-                        </div>
-                      )}
-                    </div>
+                    <InputField
+                      label="Max Load"
+                      type="text"
+                      name="maxLoad"
+                      value={editForm?.maxLoad || ""}
+                      onChange={handleChange}
+                      disabled={!isEditMode || isLoading}
+                      required={false}
+                      numeric
+                      thousandSep={true}
+                      decimalScale={2}
+                      allowNegative={false}
+                      placeholder="0.00"
+                    />
 
                     {/* Status */}
-                    <div className="flex flex-col gap-1.5">
-                      <span className="text-xxxs md:text-xxs font-semibold text-gray-600 uppercase tracking-wider">
-                        Status
-                      </span>
-                      {isEditMode ? (
-                        <div className="relative flex items-center bg-white border border-gray-200 rounded-md px-4 py-3 max-md:px-3 max-md:py-2.5 focus-within:border-gray-400 transition-all">
-                          <select
-                            name="status"
-                            value={editForm?.status || ""}
-                            onChange={handleChange}
-                            className="w-full appearance-none bg-transparent text-xs max-md:text-xxs text-gray-800 focus:outline-none capitalize"
-                          >
-                            {settings.trucksDrivers.status.map((item, i) => (
-                              <option key={i} value={item}>
-                                {item}
-                              </option>
-                            ))}
-                          </select>
-                          <MdKeyboardArrowDown className="absolute right-4 max-md:right-3 text-gray-400 text-base pointer-events-none" />
-                        </div>
-                      ) : (
-                        <div className="flex items-center bg-gray-50 border border-gray-200 rounded-md px-4 py-3 max-md:px-3 max-md:py-2.5">
-                          <p className="text-xs max-md:text-xxs text-gray-500 capitalize">
-                            {editForm?.status}
-                          </p>
-                        </div>
-                      )}
-                    </div>
+                    <SelectField
+                      label="Status"
+                      name="status"
+                      value={editForm?.status || ""}
+                      onChange={handleChange}
+                      disabled={!isEditMode || isLoading}
+                      required={false}
+                    >
+                      {settings.trucksDrivers.status.map((item, i) => (
+                        <option key={i} value={item}>
+                          {item}
+                        </option>
+                      ))}
+                    </SelectField>
 
                     {/* Trip Count */}
                     <InputField
@@ -440,9 +391,9 @@ function TruckDetailsModal({
                       name="tripCount"
                       placeholder="0"
                       value={editForm?.tripCount ?? ""}
-                      disabled={!isEditMode || isLoading}
+                      disabled={true}
                       onChange={handleChange}
-                      isRequired={false}
+                      required={false}
                     />
 
                     {/* Subcon */}
@@ -510,7 +461,7 @@ function TruckDetailsModal({
                   </div>
 
                   {/* ── Actions ── */}
-                  {isAdmin && (
+                  {["head_admin"].includes(userData.data.role) && (
                     <div className="px-6 pb-5 pt-4 max-md:px-4 max-md:pb-4 border-t border-gray-200 shrink-0">
                       {isEditMode ? (
                         <div className="flex gap-2">
@@ -555,49 +506,5 @@ function TruckDetailsModal({
     </Transition>
   );
 }
-
-/* ─── Reusable InputField ───────────────────────────────────────────────── */
-const InputField = ({
-  label,
-  type,
-  name,
-  placeholder,
-  value,
-  onChange,
-  disabled,
-  isRequired = true,
-  isUppercase = false,
-}) => (
-  <label className="flex flex-col gap-1.5">
-    <span className="text-xxxs md:text-xxs font-semibold text-gray-600 uppercase tracking-wider">
-      {label} {isRequired && <span className="text-red-400">*</span>}
-    </span>
-    <div
-      className={clsx(
-        "flex items-center border rounded-md px-4 py-3 max-md:px-3 max-md:py-2.5 transition-all duration-200",
-        disabled
-          ? "bg-gray-50 border-gray-200"
-          : "bg-white border-gray-200 focus-within:border-gray-400",
-      )}
-    >
-      <input
-        type={type}
-        name={name}
-        placeholder={placeholder}
-        value={value}
-        minLength={type === "number" ? undefined : 2}
-        maxLength={type === "number" ? undefined : 50}
-        onChange={onChange}
-        disabled={disabled}
-        required={isRequired}
-        className={clsx(
-          "flex-1 text-xs max-md:text-xxs placeholder-gray-400 bg-transparent focus:outline-none min-w-0",
-          disabled ? "text-gray-500" : "text-gray-800",
-          isUppercase ? "uppercase" : "capitalize",
-        )}
-      />
-    </div>
-  </label>
-);
 
 export default TruckDetailsModal;

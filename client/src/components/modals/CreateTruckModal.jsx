@@ -234,13 +234,13 @@ function CreateTruckModal({ isOpen, onClose, onCreate }) {
                     <InputField
                       label="Max Load (kg)"
                       name="maxLoad"
-                      placeholder="0"
+                      placeholder="0.00"
                       value={formData.maxLoad}
                       onChange={handleChange}
                       disabled={isLoading}
                       numeric
                       thousandSep
-                      decimalScale={0}
+                      decimalScale={2}
                       allowNegative={false}
                     />
                     <SelectField

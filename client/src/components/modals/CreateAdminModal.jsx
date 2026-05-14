@@ -9,10 +9,12 @@ import {
 import { IoClose } from "react-icons/io5";
 import { TbCheck } from "react-icons/tb";
 import { toast } from "react-toastify";
-import clsx from "clsx";
 import useCreateUser from "../../hooks/useCreateUser";
 import { TbUpload } from "react-icons/tb";
 import ActionButton from "../ui/ActionButton";
+import InputField from "../ui/InputField";
+import SelectField from "../ui/SelectField";
+import { COMPANY_OPTIONS } from "../../utils/userOptions";
 
 /* ─── Decorative dot pattern ────────────────────────────────────────────── */
 const DotPattern = () => (
@@ -44,6 +46,7 @@ function CreateAdminModal({ isOpen, onClose, onCreate }) {
     phoneNo: "",
     role: "admin",
     status: "active",
+    company: "",
     password: "",
     confirmPassword: "",
     image: {},
@@ -232,19 +235,37 @@ function CreateAdminModal({ isOpen, onClose, onCreate }) {
                       value={formData.email}
                       onChange={handleChange}
                       disabled={isLoading}
-                      isCapitalize={false}
                     />
                     <InputField
                       label="Phone No."
                       type="tel"
                       name="phoneNo"
                       placeholder="09XXXXXXXXX"
-                      pattern="^(09|\+639)\d{9}$"
                       value={formData.phoneNo}
                       onChange={handleChange}
                       disabled={isLoading}
                       maxLength={11}
+                      required={false}
                     />
+                    <div className="col-span-full">
+                      <SelectField
+                        label="Company"
+                        name="company"
+                        value={formData.company}
+                        onChange={handleChange}
+                        disabled={isLoading}
+                        required
+                      >
+                        <option value="" disabled>
+                          Select company
+                        </option>
+                        {COMPANY_OPTIONS.map((item, i) => (
+                          <option key={i} value={item}>
+                            {item}
+                          </option>
+                        ))}
+                      </SelectField>
+                    </div>
                     <InputField
                       label="Password"
                       type="password"
@@ -253,7 +274,6 @@ function CreateAdminModal({ isOpen, onClose, onCreate }) {
                       value={formData.password}
                       onChange={handleChange}
                       disabled={isLoading}
-                      isCapitalize={false}
                     />
                     <InputField
                       label="Confirm Password"
@@ -263,7 +283,6 @@ function CreateAdminModal({ isOpen, onClose, onCreate }) {
                       value={formData.confirmPassword}
                       onChange={handleChange}
                       disabled={isLoading}
-                      isCapitalize={false}
                     />
                   </div>
 
@@ -288,53 +307,5 @@ function CreateAdminModal({ isOpen, onClose, onCreate }) {
     </Transition>
   );
 }
-
-/* ─── InputField ─────────────────────────────────────────────────────────── */
-const InputField = ({
-  label,
-  type,
-  name,
-  placeholder,
-  value,
-  onChange,
-  disabled,
-  pattern,
-  maxLength,
-  isRequired = true,
-  isCapitalize = true,
-  isUppercase = false,
-}) => (
-  <label className="flex flex-col gap-1.5">
-    <span className="text-xxxs md:text-xxs font-semibold text-gray-600 uppercase tracking-wider">
-      {label} {isRequired && <span className="text-red-400">*</span>}
-    </span>
-    <div
-      className={clsx(
-        "flex items-center border rounded-md px-4 py-3 max-md:px-3 max-md:py-2.5 transition-all duration-200",
-        disabled
-          ? "bg-gray-50 border-gray-200"
-          : "bg-white border-gray-200 focus-within:border-gray-400",
-      )}
-    >
-      <input
-        type={type}
-        name={name}
-        placeholder={placeholder}
-        value={value}
-        minLength={2}
-        maxLength={maxLength || 50}
-        pattern={pattern}
-        onChange={onChange}
-        disabled={disabled}
-        required={isRequired}
-        className={clsx(
-          "flex-1 text-xs max-md:text-xxs placeholder-gray-400 bg-transparent focus:outline-none min-w-0",
-          disabled ? "text-gray-500" : "text-gray-800",
-          { capitalize: isCapitalize && !isUppercase, uppercase: isUppercase },
-        )}
-      />
-    </div>
-  </label>
-);
 
 export default CreateAdminModal;

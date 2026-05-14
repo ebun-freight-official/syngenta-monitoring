@@ -361,7 +361,7 @@ function UserDetailsModal({
                   className="flex-1 flex flex-col"
                 >
                   <div className="flex-1 px-6 py-5 max-md:px-4 max-md:pt-4 grid grid-cols-2 gap-x-4 gap-y-4 max-md:gap-x-3 max-md:gap-y-3 content-start">
-                    {/* visitor view */}
+                    {/* visitor modal */}
                     {["visitor"].includes(editForm?.role) && (
                       <>
                         <InputField
@@ -412,16 +412,16 @@ function UserDetailsModal({
                           ))}
                         </SelectField>
 
-                        <SelectField
+                        <InputField
                           label="Role"
+                          type="text"
                           name="role"
+                          placeholder="Role"
                           value={editForm?.role || ""}
+                          disabled={true}
                           onChange={handleChange}
-                          disabled={!isEditMode || isLoading || !isAdminTarget}
-                        >
-                          <option value="admin">Admin</option>
-                          <option value="head_admin">Head Admin</option>
-                        </SelectField>
+                          isCapitalize={false}
+                        />
 
                         <SelectField
                           label="Status"
@@ -442,7 +442,7 @@ function UserDetailsModal({
                       </>
                     )}
 
-                    {/* subcon view */}
+                    {/* subcon modal */}
                     {["subcon"].includes(editForm?.role) && (
                       <>
                         <InputField
@@ -480,7 +480,7 @@ function UserDetailsModal({
                           label="Phone No."
                           type="tel"
                           name="phoneNo"
-                          placeholder="Phone No."
+                          placeholder="-"
                           value={editForm?.phoneNo || ""}
                           disabled={!isEditMode || isLoading}
                           onChange={handleChange}
@@ -524,6 +524,7 @@ function UserDetailsModal({
                       </>
                     )}
 
+                    {/* admin modal */}
                     {["head_admin", "admin"].includes(editForm?.role) && (
                       <>
                         <InputField
@@ -561,7 +562,7 @@ function UserDetailsModal({
                           label="Phone No."
                           type="tel"
                           name="phoneNo"
-                          placeholder="Phone No."
+                          placeholder="-"
                           value={editForm?.phoneNo || ""}
                           disabled={!isEditMode || isLoading}
                           onChange={handleChange}
@@ -639,8 +640,8 @@ function UserDetailsModal({
                         value={editForm?.password || ""}
                         disabled={!isEditMode || isLoading}
                         onChange={handleChange}
-                        isRequired={false}
                         isCapitalize={false}
+                        required={false}
                       />
                       <InputField
                         label="Confirm Password"
@@ -650,14 +651,14 @@ function UserDetailsModal({
                         value={editForm?.confirmPassword || ""}
                         disabled={!isEditMode || isLoading}
                         onChange={handleChange}
-                        isRequired={false}
                         isCapitalize={false}
+                        required={false}
                       />
                     </div>
                   </div>
 
                   {/* ── Actions ── */}
-                  {currentUser?.role === "head_admin" && (
+                  {["head_admin"].includes(currentUser?.role) && (
                     <div className="px-6 pb-5 pt-4 max-md:px-4 max-md:pb-4 border-t border-gray-200 shrink-0">
                       {isEditMode ? (
                         <div className="flex gap-2">

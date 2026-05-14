@@ -192,19 +192,21 @@ function VisitorManagement() {
               subheader={"View and manage all visitors in the system"}
             />
 
-            <div className="flex gap-2 xl:hidden">
-              <button
-                onClick={() => setIsCreateVisitorModalOpen(true)}
-                disabled={isLoading}
-                className={clsx(
-                  btnBase,
-                  "bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-100",
-                )}
-              >
-                <FaPlus className="text-xs" />
-                <span className="text-xs sm:text-sm">Create New</span>
-              </button>
-            </div>
+            {["head_admin"].includes(userData.data?.role) && (
+              <div className="flex gap-2 xl:hidden">
+                <button
+                  onClick={() => setIsCreateVisitorModalOpen(true)}
+                  disabled={isLoading}
+                  className={clsx(
+                    btnBase,
+                    "bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-100",
+                  )}
+                >
+                  <FaPlus className="text-xs" />
+                  <span className="text-xs sm:text-sm">Create New</span>
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="flex flex-wrap justify-between gap-2 w-full xl:w-auto">
@@ -297,17 +299,19 @@ function VisitorManagement() {
               </div>
 
               {/* xl Create */}
-              <button
-                onClick={() => setIsCreateVisitorModalOpen(true)}
-                disabled={isLoading}
-                className={clsx(
-                  btnBase,
-                  "bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-100 max-xl:hidden",
-                )}
-              >
-                <FaPlus className="text-xs" />
-                <span>Create New</span>
-              </button>
+              {["head_admin"].includes(userData.data?.role) && (
+                <button
+                  onClick={() => setIsCreateVisitorModalOpen(true)}
+                  disabled={isLoading}
+                  className={clsx(
+                    btnBase,
+                    "bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-100 max-xl:hidden",
+                  )}
+                >
+                  <FaPlus className="text-xs" />
+                  <span>Create New</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -322,7 +326,7 @@ function VisitorManagement() {
         ) : (
           <div className="relative flex-1 overflow-y-auto scrollbar-thin bg-white">
             <div className="absolute inset-0">
-              <table className="table text-xs sm:table-sm table-pin-rows table-pin-cols">
+              <table className="table text-xs sm:table-sm table-pin-rows table-pin-cols border-collapse">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 max-md:text-xxs text-xs uppercase tracking-wide">
                     <td>{total}</td>
@@ -331,6 +335,7 @@ function VisitorManagement() {
                     <td>Email</td>
                     <td>Phone No.</td>
                     <td>Role</td>
+                    <td>Company</td>
                     <td>Status</td>
                     <td>Login Count</td>
                   </tr>
@@ -359,6 +364,9 @@ function VisitorManagement() {
                       <td className="max-sm:text-xxs">{visitor.phoneNo}</td>
                       <td className="capitalize max-sm:text-xxs">
                         {visitor.role}
+                      </td>
+                      <td className="capitalize max-sm:text-xxs">
+                        {visitor.company}
                       </td>
                       <td>
                         <div

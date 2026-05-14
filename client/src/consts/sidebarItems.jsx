@@ -81,7 +81,7 @@ export const SIDEBAR_ITEMS = [
     icon: <TbUserShield />,
     name: "Admin Management",
     path: "/secure/admin-management",
-    role: ["head_admin", "admin"],
+    role: ["head_admin"],
   },
   {
     icon: <TbLicense />,
@@ -93,7 +93,7 @@ export const SIDEBAR_ITEMS = [
     icon: <TbSettings />,
     name: "System Settings",
     path: "/secure/system-settings",
-    role: ["head_admin", "admin"],
+    role: ["head_admin"],
   },
 ];
 

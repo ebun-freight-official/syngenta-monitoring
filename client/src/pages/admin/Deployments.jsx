@@ -569,28 +569,30 @@ function Deployments() {
             />
 
             {/* admin with small screen */}
-            <div className="flex gap-2 xl:hidden">
-              {["head_admin", "admin"].includes(userData.data.role) && (
+            {["head_admin", "admin"].includes(userData.data.role) && (
+              <div className="flex gap-2 xl:hidden">
                 <>
-                  <div className="dropdown dropdown-center">
-                    <div
-                      tabIndex={0}
-                      role="button"
-                      className={clsx(
-                        btnBase,
-                        "relative bg-blue-50 text-blue-600 border border-blue-100 hover:bg-blue-100",
-                      )}
-                    >
-                      <BiExport className="text-sm sm:text-base" />
-                      <span className="text-xs sm:text-sm">Export</span>
-                      {selectedIds.size > 0 && (
-                        <span className="absolute -top-1.5 -right-1.5 bg-blue-600 text-white text-xxs font-semibold min-w-4.5 h-4.5 flex items-center justify-center px-1 rounded-full leading-none">
-                          {selectedIds.size}
-                        </span>
-                      )}
+                  {["head_admin"].includes(userData.data.role) && (
+                    <div className="dropdown dropdown-center">
+                      <div
+                        tabIndex={0}
+                        role="button"
+                        className={clsx(
+                          btnBase,
+                          "relative bg-blue-50 text-blue-600 border border-blue-100 hover:bg-blue-100",
+                        )}
+                      >
+                        <BiExport className="text-sm sm:text-base" />
+                        <span className="text-xs sm:text-sm">Export</span>
+                        {selectedIds.size > 0 && (
+                          <span className="absolute -top-1.5 -right-1.5 bg-blue-600 text-white text-xxs font-semibold min-w-4.5 h-4.5 flex items-center justify-center px-1 rounded-full leading-none">
+                            {selectedIds.size}
+                          </span>
+                        )}
+                      </div>
+                      <ExportDropdownContent className="w-[calc(100vw-2rem)] max-w-sm" />
                     </div>
-                    <ExportDropdownContent className="w-[calc(100vw-2rem)] max-w-sm" />
-                  </div>
+                  )}
 
                   <button
                     onClick={() => setIsCreateDeploymentModalOpen(true)}
@@ -604,8 +606,8 @@ function Deployments() {
                     <span className="text-xs sm:text-sm">Deploy</span>
                   </button>
                 </>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           {/* Right: search + filter + pagination + xl export+create */}
@@ -781,7 +783,7 @@ function Deployments() {
               </div>
 
               {/* xl Export */}
-              {["head_admin", "admin"].includes(userData.data.role) && (
+              {["head_admin"].includes(userData.data.role) && (
                 <div className="dropdown dropdown-end sm:dropdown-center max-xl:hidden">
                   <div
                     tabIndex={0}

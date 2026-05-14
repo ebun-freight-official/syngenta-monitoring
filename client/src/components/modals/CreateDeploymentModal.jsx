@@ -16,6 +16,8 @@ import ActionButton from "../ui/ActionButton";
 import InputField from "../ui/InputField";
 import SelectField from "../ui/SelectField";
 import ComboboxField from "../ui/ComboboxField";
+import { COMPANY_OPTIONS } from "../../utils/userOptions";
+import { useUserContext } from "../../contexts/UserContext";
 
 const defaultPickup = {
   pickupSite: "",
@@ -44,11 +46,14 @@ const defaultValue = {
   departed: "",
   destArrival: "",
   destDeparture: "",
+  company: "",
 };
 
 const MAX_PICKUPS = 10;
 
 function CreateDeploymentModal({ isOpen, onClose, onCreate, trucks, drivers }) {
+  const { userData } = useUserContext();
+
   const { settings } = useSettingsContext();
   const [formData, setFormData] = useState(defaultValue);
   const { createDeploymentFunction, isLoading } = useCreateDeployment();
@@ -597,6 +602,36 @@ function CreateDeploymentModal({ isOpen, onClose, onCreate, trucks, drivers }) {
                       />
                     </div>
                   </div>
+
+                  {/* ── OTHERS ── */}
+                  {["head_admin"].includes(userData.data.role) && (
+                    <div className="space-y-2">
+                      <h3 className="text-xxxs md:text-xxs font-semibold text-gray-600 uppercase tracking-wider">
+                        Others
+                      </h3>
+                      <div className="grid grid-cols-1 xs:grid-cols-2 gap-x-4 gap-y-4 max-sm:gap-x-3 max-sm:gap-y-3 border border-gray-200 rounded-md p-5 max-sm:p-4">
+                        <div className="col-span-full">
+                          <SelectField
+                            label="Company"
+                            name="company"
+                            value={formData.company}
+                            onChange={handleChange}
+                            disabled={isLoading}
+                            required
+                          >
+                            <option value="" disabled>
+                              Select company
+                            </option>
+                            {COMPANY_OPTIONS.map((item, i) => (
+                              <option key={i} value={item}>
+                                {item}
+                              </option>
+                            ))}
+                          </SelectField>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* ── Action Bar ── */}
