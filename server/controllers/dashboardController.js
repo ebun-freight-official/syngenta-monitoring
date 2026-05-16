@@ -16,6 +16,14 @@ const getDashboardAnalytics = async (req, res) => {
     const baseFilter = { isSoftDeleted: { $ne: true } };
     const truckAndDriverFilter = { isSoftDeleted: { $ne: true } };
 
+    // ── head_admin company filter (from query param) ───────────────────────
+    // Only honoured when req.user.role === "head_admin" and ?company= is set.
+    const companyParam =
+      req.user.role === "head_admin" && req.query.company
+        ? req.query.company
+        : null;
+
+    // ── Subcon: filter trucks/drivers by their subcon tag ─────────────────
     if (req.user.role === "subcon" && req.user.subcon) {
       truckAndDriverFilter.subcon = req.user.subcon;
     }
@@ -28,13 +36,36 @@ const getDashboardAnalytics = async (req, res) => {
       subconTruckIds = subconTrucks.map((t) => t._id);
     }
 
-    const deploymentFilter = subconTruckIds
-      ? { ...baseFilter, truckId: { $in: subconTruckIds } }
-      : { ...baseFilter };
+    // ── Build deployment filter ───────────────────────────────────────────
+    // head_admin + company param → filter by company
+    // head_admin (no param)      → all deployments
+    // admin                      → only deployments belonging to their company
+    // subcon                     → only deployments whose truck is in their pool
+    let deploymentFilter = { ...baseFilter };
+
+    if (req.user.role === "head_admin" && companyParam) {
+      deploymentFilter.company = companyParam;
+    } else if (req.user.role === "admin" && req.user.company) {
+      deploymentFilter.company = req.user.company;
+    } else if (subconTruckIds) {
+      deploymentFilter.truckId = { $in: subconTruckIds };
+    }
+
+    // ── Build user filter ─────────────────────────────────────────────────
+    // head_admin + company param → filter users by company
+    // head_admin (no param)      → all users
+    // admin                      → users scoped to their company
+    const userScopeFilter = {
+      isSoftDeleted: { $ne: true },
+      ...(companyParam
+        ? { company: companyParam }
+        : req.user.role === "admin" && req.user.company
+          ? { company: req.user.company }
+          : {}),
+    };
 
     const promises = {
       // ── Deployment counts ─────────────────────────────────────────────
-      // FIX: moved totalDeployments into promises to avoid a separate post-Promise.all query
       totalDeployments: Deployment.countDocuments(deploymentFilter),
 
       preparingDeployments: Deployment.countDocuments({
@@ -107,17 +138,17 @@ const getDashboardAnalytics = async (req, res) => {
       }),
 
       // ── User counts ───────────────────────────────────────────────────
-      totalUsers: User.countDocuments({ isSoftDeleted: { $ne: true } }),
+      totalUsers: User.countDocuments(userScopeFilter),
       activeUsers: User.countDocuments({
-        isSoftDeleted: { $ne: true },
+        ...userScopeFilter,
         status: "active",
       }),
       pendingUsers: User.countDocuments({
-        isSoftDeleted: { $ne: true },
+        ...userScopeFilter,
         status: "pending",
       }),
       recentRegistrations: User.countDocuments({
-        isSoftDeleted: { $ne: true },
+        ...userScopeFilter,
         createdAt: { $gte: last30Days },
       }),
 
@@ -163,10 +194,7 @@ const getDashboardAnalytics = async (req, res) => {
         { $group: { _id: "$status", count: { $sum: 1 } } },
       ]),
 
-      // FIX: removed weeklyDeploymentAnalytics — it was never consumed by the frontend
-      // and duplicated data already present in weeklyDeploymentStatusAnalytics
-
-      // Weekly trends (last 12 weeks) — grouped by departed (when truck left the station)
+      // Weekly trends (last 12 weeks) — grouped by departed
       weeklyDeploymentStatusAnalytics: Deployment.aggregate([
         {
           $match: {
@@ -284,10 +312,7 @@ const getDashboardAnalytics = async (req, res) => {
         { $sort: { "_id.year": 1, "_id.month": 1, "_id.week": 1 } },
       ]),
 
-      // ── Weight breakdown (est / field / plant) per week ───────────────
-      // ── Weight breakdown (est / field / plant) per week ───────────────
-      // Uses departed (ISO string) — the date the truck left the station,
-      // which is more accurate than createdAt for grouping actual weight data.
+      // Weight breakdown (est / field / plant) per week
       weeklyWeightBreakdown: Deployment.aggregate([
         {
           $match: {
@@ -307,11 +332,7 @@ const getDashboardAnalytics = async (req, res) => {
             },
           },
         },
-        {
-          $match: {
-            departedDate: { $gte: last12Weeks },
-          },
-        },
+        { $match: { departedDate: { $gte: last12Weeks } } },
         { $unwind: "$pickups" },
         {
           $group: {
@@ -357,7 +378,7 @@ const getDashboardAnalytics = async (req, res) => {
         { $sort: { "_id.year": 1, "_id.month": 1, "_id.week": 1 } },
       ]),
 
-      // ── Weight breakdown (est / field / plant) per day ────────────────
+      // Weight breakdown (est / field / plant) per day
       dailyWeightBreakdown: Deployment.aggregate([
         {
           $match: {
@@ -377,11 +398,7 @@ const getDashboardAnalytics = async (req, res) => {
             },
           },
         },
-        {
-          $match: {
-            departedDate: { $gte: last30Days },
-          },
-        },
+        { $match: { departedDate: { $gte: last30Days } } },
         { $unwind: "$pickups" },
         {
           $group: {
@@ -428,11 +445,7 @@ const getDashboardAnalytics = async (req, res) => {
       topPickupSites: Deployment.aggregate([
         { $match: deploymentFilter },
         { $unwind: "$pickups" },
-        {
-          $match: {
-            "pickups.pickupSite": { $exists: true, $ne: "" },
-          },
-        },
+        { $match: { "pickups.pickupSite": { $exists: true, $ne: "" } } },
         {
           $group: {
             _id: "$pickups.pickupSite",
@@ -494,7 +507,6 @@ const getDashboardAnalytics = async (req, res) => {
         },
       ]),
 
-      // FIX: moved totalSacks aggregate into promises to avoid a separate post-Promise.all query
       totalSacksAggregate: Deployment.aggregate([
         { $match: { ...deploymentFilter, status: { $ne: "canceled" } } },
         {
@@ -506,27 +518,30 @@ const getDashboardAnalytics = async (req, res) => {
         },
       ]),
 
+      // ── User aggregations ─────────────────────────────────────────────
       userRoleAnalytics: User.aggregate([
-        { $match: { isSoftDeleted: { $ne: true } } },
+        { $match: userScopeFilter },
         { $group: { _id: "$role", count: { $sum: 1 } } },
       ]),
       userStatusAnalytics: User.aggregate([
-        { $match: { isSoftDeleted: { $ne: true } } },
+        { $match: userScopeFilter },
         { $group: { _id: "$status", count: { $sum: 1 } } },
       ]),
-      subconAnalytics: User.aggregate([
+
+      subconAnalytics: Truck.aggregate([
         {
           $match: {
-            isSoftDeleted: { $ne: true },
-            subcon: { $exists: true, $ne: "" },
+            ...truckAndDriverFilter,
+            subcon: { $exists: true, $ne: null, $ne: "" },
           },
         },
         { $group: { _id: "$subcon", count: { $sum: 1 } } },
         { $sort: { count: -1 } },
         { $limit: 10 },
       ]),
+
       userLoginAnalytics: User.aggregate([
-        { $match: { isSoftDeleted: { $ne: true } } },
+        { $match: userScopeFilter },
         {
           $group: {
             _id: null,
@@ -558,7 +573,6 @@ const getDashboardAnalytics = async (req, res) => {
         },
         {
           $addFields: {
-            // FIX: guard against replacementTruck existing but having null subcon
             activeSubcon: {
               $cond: [
                 {
@@ -634,30 +648,56 @@ const getDashboardAnalytics = async (req, res) => {
 
       territoryAnalytics: Deployment.aggregate([
         { $match: deploymentFilter },
-        { $group: { _id: "$territory", count: { $sum: 1 } } },
+        { $unwind: "$pickups" },
+        { $match: { "pickups.territory": { $exists: true, $ne: "" } } },
+        { $group: { _id: "$pickups.territory", count: { $sum: 1 } } },
         { $sort: { count: -1 } },
       ]),
       hybridAnalytics: Deployment.aggregate([
         { $match: deploymentFilter },
-        { $group: { _id: "$hybrid", count: { $sum: 1 } } },
+        { $unwind: "$pickups" },
+        { $match: { "pickups.hybrid": { $exists: true, $ne: "" } } },
+        { $group: { _id: "$pickups.hybrid", count: { $sum: 1 } } },
         { $sort: { count: -1 } },
       ]),
       flaggingAnalytics: Deployment.aggregate([
         { $match: deploymentFilter },
-        { $group: { _id: "$flagging", count: { $sum: 1 } } },
+        { $unwind: "$pickups" },
+        { $match: { "pickups.flagging": { $exists: true, $ne: "" } } },
+        { $group: { _id: "$pickups.flagging", count: { $sum: 1 } } },
         { $sort: { count: -1 } },
       ]),
 
       territoryPerformance: Deployment.aggregate([
         { $match: deploymentFilter },
+        { $unwind: "$pickups" },
+        { $match: { "pickups.territory": { $exists: true, $ne: "" } } },
         {
           $group: {
-            _id: "$territory",
+            _id: "$pickups.territory",
             count: { $sum: 1 },
-            totalSacks: { $sum: "$totalSacksCount" },
-            totalWeight: { $sum: "$totalWeightKg" },
-            avgSacks: { $avg: "$totalSacksCount" },
-            avgWeight: { $avg: "$totalWeightKg" },
+            totalSacks: { $sum: "$pickups.sacksCount" },
+            totalWeight: {
+              $sum: {
+                $convert: {
+                  input: "$pickups.plantWeightKg",
+                  to: "double",
+                  onError: 0,
+                  onNull: 0,
+                },
+              },
+            },
+            avgSacks: { $avg: "$pickups.sacksCount" },
+            avgWeight: {
+              $avg: {
+                $convert: {
+                  input: "$pickups.plantWeightKg",
+                  to: "double",
+                  onError: 0,
+                  onNull: 0,
+                },
+              },
+            },
             completed: {
               $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] },
             },
@@ -665,14 +705,25 @@ const getDashboardAnalytics = async (req, res) => {
               $sum: {
                 $cond: [
                   { $eq: ["$status", "completed"] },
-                  "$totalSacksCount",
+                  "$pickups.sacksCount",
                   0,
                 ],
               },
             },
             completedWeight: {
               $sum: {
-                $cond: [{ $eq: ["$status", "completed"] }, "$totalWeightKg", 0],
+                $cond: [
+                  { $eq: ["$status", "completed"] },
+                  {
+                    $convert: {
+                      input: "$pickups.plantWeightKg",
+                      to: "double",
+                      onError: 0,
+                      onNull: 0,
+                    },
+                  },
+                  0,
+                ],
               },
             },
           },
@@ -703,14 +754,34 @@ const getDashboardAnalytics = async (req, res) => {
 
       hybridPerformance: Deployment.aggregate([
         { $match: { ...deploymentFilter, status: { $ne: "canceled" } } },
+        { $unwind: "$pickups" },
+        { $match: { "pickups.hybrid": { $exists: true, $ne: "" } } },
         {
           $group: {
-            _id: "$hybrid",
+            _id: "$pickups.hybrid",
             count: { $sum: 1 },
-            totalSacks: { $sum: "$totalSacksCount" },
-            totalWeight: { $sum: "$totalWeightKg" },
-            avgSacks: { $avg: "$totalSacksCount" },
-            avgWeight: { $avg: "$totalWeightKg" },
+            totalSacks: { $sum: "$pickups.sacksCount" },
+            totalWeight: {
+              $sum: {
+                $convert: {
+                  input: "$pickups.plantWeightKg",
+                  to: "double",
+                  onError: 0,
+                  onNull: 0,
+                },
+              },
+            },
+            avgSacks: { $avg: "$pickups.sacksCount" },
+            avgWeight: {
+              $avg: {
+                $convert: {
+                  input: "$pickups.plantWeightKg",
+                  to: "double",
+                  onError: 0,
+                  onNull: 0,
+                },
+              },
+            },
           },
         },
         { $sort: { count: -1 } },
@@ -718,14 +789,34 @@ const getDashboardAnalytics = async (req, res) => {
 
       flaggingPerformance: Deployment.aggregate([
         { $match: { ...deploymentFilter, status: { $ne: "canceled" } } },
+        { $unwind: "$pickups" },
+        { $match: { "pickups.flagging": { $exists: true, $ne: "" } } },
         {
           $group: {
-            _id: "$flagging",
+            _id: "$pickups.flagging",
             count: { $sum: 1 },
-            totalSacks: { $sum: "$totalSacksCount" },
-            totalWeight: { $sum: "$totalWeightKg" },
-            avgSacks: { $avg: "$totalSacksCount" },
-            avgWeight: { $avg: "$totalWeightKg" },
+            totalSacks: { $sum: "$pickups.sacksCount" },
+            totalWeight: {
+              $sum: {
+                $convert: {
+                  input: "$pickups.plantWeightKg",
+                  to: "double",
+                  onError: 0,
+                  onNull: 0,
+                },
+              },
+            },
+            avgSacks: { $avg: "$pickups.sacksCount" },
+            avgWeight: {
+              $avg: {
+                $convert: {
+                  input: "$pickups.plantWeightKg",
+                  to: "double",
+                  onError: 0,
+                  onNull: 0,
+                },
+              },
+            },
           },
         },
         { $sort: { count: -1 } },
@@ -733,36 +824,69 @@ const getDashboardAnalytics = async (req, res) => {
 
       territoryStatusAnalytics: Deployment.aggregate([
         { $match: deploymentFilter },
+        { $unwind: "$pickups" },
+        { $match: { "pickups.territory": { $exists: true, $ne: "" } } },
         {
           $group: {
-            _id: { territory: "$territory", status: "$status" },
+            _id: { territory: "$pickups.territory", status: "$status" },
             count: { $sum: 1 },
-            totalSacks: { $sum: "$totalSacksCount" },
-            totalWeight: { $sum: "$totalWeightKg" },
+            totalSacks: { $sum: "$pickups.sacksCount" },
+            totalWeight: {
+              $sum: {
+                $convert: {
+                  input: "$pickups.plantWeightKg",
+                  to: "double",
+                  onError: 0,
+                  onNull: 0,
+                },
+              },
+            },
           },
         },
         { $sort: { "_id.territory": 1 } },
       ]),
       hybridStatusAnalytics: Deployment.aggregate([
         { $match: deploymentFilter },
+        { $unwind: "$pickups" },
+        { $match: { "pickups.hybrid": { $exists: true, $ne: "" } } },
         {
           $group: {
-            _id: { hybrid: "$hybrid", status: "$status" },
+            _id: { hybrid: "$pickups.hybrid", status: "$status" },
             count: { $sum: 1 },
-            totalSacks: { $sum: "$totalSacksCount" },
-            totalWeight: { $sum: "$totalWeightKg" },
+            totalSacks: { $sum: "$pickups.sacksCount" },
+            totalWeight: {
+              $sum: {
+                $convert: {
+                  input: "$pickups.plantWeightKg",
+                  to: "double",
+                  onError: 0,
+                  onNull: 0,
+                },
+              },
+            },
           },
         },
         { $sort: { "_id.hybrid": 1 } },
       ]),
       flaggingStatusAnalytics: Deployment.aggregate([
         { $match: deploymentFilter },
+        { $unwind: "$pickups" },
+        { $match: { "pickups.flagging": { $exists: true, $ne: "" } } },
         {
           $group: {
-            _id: { flagging: "$flagging", status: "$status" },
+            _id: { flagging: "$pickups.flagging", status: "$status" },
             count: { $sum: 1 },
-            totalSacks: { $sum: "$totalSacksCount" },
-            totalWeight: { $sum: "$totalWeightKg" },
+            totalSacks: { $sum: "$pickups.sacksCount" },
+            totalWeight: {
+              $sum: {
+                $convert: {
+                  input: "$pickups.plantWeightKg",
+                  to: "double",
+                  onError: 0,
+                  onNull: 0,
+                },
+              },
+            },
           },
         },
         { $sort: { "_id.flagging": 1 } },
@@ -935,7 +1059,6 @@ const getDashboardAnalytics = async (req, res) => {
     );
 
     // ── Derived metrics ───────────────────────────────────────────────────
-    // FIX: totalDeployments now comes from data instead of a second DB query
     const totalDeployments = data.totalDeployments;
 
     const completionRate =
@@ -953,7 +1076,6 @@ const getDashboardAnalytics = async (req, res) => {
         ? ((data.completedDeployments / finalizedDeployments) * 100).toFixed(1)
         : 0;
 
-    // FIX: totalSacks now comes from the promises batch
     const totalSacks = data.totalSacksAggregate[0]?.totalSacks || 0;
     const totalWeight = data.totalSacksAggregate[0]?.totalWeight || 0;
 
@@ -985,7 +1107,6 @@ const getDashboardAnalytics = async (req, res) => {
     const avgLoginCount = userLoginData.avgLoginCount || 0;
     const maxLoginCount = userLoginData.maxLoginCount || 0;
 
-    // totalOngoingDeployments: preparing + ongoing
     const totalOngoingDeployments =
       (data.preparingDeployments || 0) + (data.ongoingDeployments || 0);
 
@@ -1013,7 +1134,10 @@ const getDashboardAnalytics = async (req, res) => {
 
     const userRoleData = formatArrayData(data.userRoleAnalytics);
     const userStatusData = formatArrayData(data.userStatusAnalytics);
-    const subconData = formatArrayData(data.subconAnalytics);
+
+    const subconData = formatArrayData(data.subconAnalytics).filter(
+      (item) => item._id && item._id !== "",
+    );
 
     const formatWeekLabel = (year, month, week) => {
       const monthNames = [
@@ -1065,8 +1189,6 @@ const getDashboardAnalytics = async (req, res) => {
         }
         if (status === "completed") weeklyMap[weekKey].completed = count;
       });
-      // FIX: removed .filter(week => week.completed > 0)
-      // Keeping weeks with 0 completions avoids misleading gaps in the trend line.
       return Object.values(weeklyMap)
         .sort((a, b) => {
           if (a.year !== b.year) return a.year - b.year;
@@ -1169,7 +1291,6 @@ const getDashboardAnalytics = async (req, res) => {
         totalTrucks: data.totalTrucks || 0,
         totalDrivers: data.totalDrivers || 0,
         totalUsers: data.totalUsers || 0,
-        // FIX: activeDeployments here now reflects the corrected totalOngoingDeployments
         activeDeployments: totalOngoingDeployments || 0,
         availableTrucks: data.availableTrucks || 0,
         availableDrivers: data.availableDrivers || 0,
@@ -1343,7 +1464,7 @@ const getDashboardAnalytics = async (req, res) => {
           data: userStatusData.map((item) => item.count || 0),
         },
         subconDistribution: {
-          labels: subconData.map((item) => item._id || "Unknown"),
+          labels: subconData.map((item) => item._id),
           data: subconData.map((item) => item.count || 0),
         },
         subconPerformance: {
@@ -1462,11 +1583,9 @@ const getDashboardAnalytics = async (req, res) => {
       performanceMetrics: {
         totalDeployments,
         completedDeployments: data.completedDeployments,
-        // FIX: ongoingDeployments now uses the corrected totalOngoingDeployments
         ongoingDeployments: totalOngoingDeployments,
         cancelledDeployments: data.cancelledDeployments || 0,
         preparingDeployments: data.preparingDeployments || 0,
-        // ongoing-only count, used for the subtitle on the Active Deployments card
         activeOngoingDeployments: data.ongoingDeployments || 0,
         totalTrucks: data.totalTrucks,
         activeTrucks: data.activeTrucks,
@@ -1506,6 +1625,9 @@ const getDashboardAnalytics = async (req, res) => {
         hybridCount: formatArrayData(data.hybridAnalytics).length || 0,
         flaggingCount: formatArrayData(data.flaggingAnalytics).length || 0,
       },
+
+      // ── Expose the active company filter to the client ─────────────────
+      activeCompanyFilter: companyParam || null,
     };
 
     if (req.user.role === "subcon" && req.user.subcon) {

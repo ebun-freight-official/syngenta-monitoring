@@ -32,6 +32,7 @@ import {
   HiOutlineLocationMarker,
   HiOutlineBeaker,
   HiOutlineFlag,
+  HiOutlineOfficeBuilding,
 } from "react-icons/hi";
 import {
   TbRocket,
@@ -46,11 +47,13 @@ import {
   TbNumber,
   TbCalendar,
   TbCalendarWeek,
+  TbBuilding,
 } from "react-icons/tb";
 import { error_illustration } from "../../consts/images";
 import { useUserContext } from "../../contexts/UserContext";
 import clsx from "clsx";
 import { TableError, TableLoading } from "../../components/TablesState";
+import { COMPANY_OPTIONS } from "../../utils/userOptions";
 
 ChartJS.register(
   CategoryScale,
@@ -92,6 +95,9 @@ const Dashboard = () => {
   const [activeTab, setActiveTab] = useState("overview");
   const [trendPeriod, setTrendPeriod] = useState("weekly");
   const [weightPeriod, setWeightPeriod] = useState("weekly");
+
+  // ── Company filter — head_admin only ─────────────────────────────────────
+  const [selectedCompany, setSelectedCompany] = useState("all");
 
   const colors = {
     green: "#10b981",
@@ -153,16 +159,25 @@ const Dashboard = () => {
     yellow: "#f59e0b",
   };
 
+  // ── Fetch whenever selectedCompany changes (head_admin only) ─────────────
   useEffect(() => {
     fetchAnalyticsData();
-  }, []);
+  }, [selectedCompany]);
 
   const fetchAnalyticsData = async () => {
     try {
       setLoading(true);
       const token = sessionStorage.getItem("userToken");
+
+      // Build query params — only send company when a specific one is selected
+      const params = {};
+      if (selectedCompany && selectedCompany !== "all") {
+        params.company = selectedCompany;
+      }
+
       const response = await axios.get(API_ANALYTICS, {
         headers: { Authorization: `Bearer ${token}` },
+        params,
       });
 
       if (response.data.success) {
@@ -1226,9 +1241,17 @@ const Dashboard = () => {
   }
 
   const userRole = userData.data?.role;
-  const isAdmin = ["head_admin", "admin"].includes(userRole);
+
+  // ── Role flags ────────────────────────────────────────────────────────────
+  const isHeadAdmin = userRole === "head_admin";
+  const isAdmin = userRole === "admin";
+  const isAnyAdmin = isHeadAdmin || isAdmin;
   const isSubcon = userRole === "subcon";
   const isVisitor = userRole === "visitor";
+
+  // ── Company filter label ──────────────────────────────────────────────────
+  const companyFilterLabel =
+    selectedCompany === "all" ? "All Companies" : selectedCompany;
 
   return (
     <div className="flex-1 relative overflow-y-auto scrollbar-thin">
@@ -1243,7 +1266,65 @@ const Dashboard = () => {
               Real-time operational insights and performance metrics
             </p>
           </div>
+
+          {/* ── Company Filter — head_admin only ───────────────────────── */}
+          {isHeadAdmin && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5 text-xs text-gray-500 shrink-0">
+                <HiOutlineOfficeBuilding className="text-sm" />
+                <span className="font-medium">Filter by Company:</span>
+              </div>
+              <div className="flex items-center gap-1 flex-wrap">
+                {/* "All" pill */}
+                <button
+                  onClick={() => setSelectedCompany("all")}
+                  className={clsx(
+                    "px-3 py-1.5 rounded-lg text-xs font-medium transition-all border",
+                    selectedCompany === "all"
+                      ? "bg-primaryColor text-white border-primaryColor shadow-sm"
+                      : "bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:text-gray-800",
+                  )}
+                >
+                  All
+                </button>
+
+                {/* One pill per company */}
+                {COMPANY_OPTIONS.map((company) => (
+                  <button
+                    key={company}
+                    onClick={() => setSelectedCompany(company)}
+                    className={clsx(
+                      "px-3 py-1.5 rounded-lg text-xs font-medium transition-all border",
+                      selectedCompany === company
+                        ? "bg-primaryColor text-white border-primaryColor shadow-sm"
+                        : "bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:text-gray-800",
+                    )}
+                  >
+                    {company}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
+
+        {/* ── Active company filter badge (non-"all" selection) ───────── */}
+        {isHeadAdmin && selectedCompany !== "all" && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500">Showing data for:</span>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primaryColor/10 text-primaryColor text-xs font-semibold border border-primaryColor/20">
+              <HiOutlineOfficeBuilding className="text-sm" />
+              {selectedCompany}
+              <button
+                onClick={() => setSelectedCompany("all")}
+                className="ml-0.5 hover:text-primaryColor/70 transition-colors"
+                aria-label="Clear company filter"
+              >
+                <TbX className="text-sm" />
+              </button>
+            </span>
+          </div>
+        )}
 
         {/* ── Tabs ───────────────────────────────────────────────────────── */}
         <div className="flex border-b border-gray-100 overflow-x-auto scrollbar-hide">
@@ -1252,10 +1333,14 @@ const Dashboard = () => {
             {
               key: "deploymentDetails",
               label: "Deployment Details",
-              show: isAdmin || isVisitor,
+              show: isAnyAdmin || isVisitor,
             },
-            { key: "users", label: "Users", show: isAdmin },
-            { key: "subcons", label: "Subcontractors", show: isAdmin },
+            {
+              key: "users",
+              label: "Users",
+              show: isHeadAdmin,
+            },
+            { key: "subcons", label: "Subcontractors", show: isAnyAdmin },
             { key: "resources", label: "My Resources", show: isSubcon },
           ]
             .filter((t) => t.show)
@@ -1388,8 +1473,8 @@ const Dashboard = () => {
               )}
             </div>
 
-            {/* Admin extra metrics — desktop */}
-            {isAdmin && (
+            {/* Admin extra metrics — desktop (both admin & head_admin) */}
+            {isAnyAdmin && (
               <div className="grid grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6 gap-2 sm:gap-3 max-xs:hidden">
                 <MetricCard
                   icon={HiOutlineTruck}
@@ -1556,8 +1641,8 @@ const Dashboard = () => {
               )}
             </div>
 
-            {/* Admin extra metrics — mobile */}
-            {isAdmin && (
+            {/* Admin extra metrics — mobile (both admin & head_admin) */}
+            {isAnyAdmin && (
               <div className="grid grid-cols-2 gap-2 xs:hidden">
                 <MetricCardMobile
                   icon={HiOutlineTruck}
@@ -1774,8 +1859,8 @@ const Dashboard = () => {
               </ScrollableChart>
             </div>
 
-            {/* Admin fleet charts */}
-            {isAdmin && (
+            {/* Fleet charts — visible to both admin & head_admin */}
+            {isAnyAdmin && (
               <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-2 sm:gap-4">
                 <div className={CLS.card}>
                   <CardHeader
@@ -1840,7 +1925,7 @@ const Dashboard = () => {
         {/* ════════════════════════════════════════════════════════════════
             DEPLOYMENT DETAILS TAB
         ════════════════════════════════════════════════════════════════ */}
-        {activeTab === "deploymentDetails" && (isAdmin || isVisitor) && (
+        {activeTab === "deploymentDetails" && (isAnyAdmin || isVisitor) && (
           <div className={CLS.tabSection}>
             {/* Metrics — desktop */}
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3 max-xs:hidden">
@@ -2047,9 +2132,9 @@ const Dashboard = () => {
         )}
 
         {/* ════════════════════════════════════════════════════════════════
-            USERS TAB
+            USERS TAB — head_admin only
         ════════════════════════════════════════════════════════════════ */}
-        {activeTab === "users" && isAdmin && (
+        {activeTab === "users" && isHeadAdmin && (
           <div className={CLS.tabSection}>
             {/* Top row metrics — desktop */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 max-xs:hidden">
@@ -2229,17 +2314,17 @@ const Dashboard = () => {
               </div>
             </div>
 
-            {/* Subcontractor Distribution — moved here from Subcons tab */}
+            {/* Subcontractor Distribution */}
             <div className={CLS.card}>
               <CardHeader
                 title="Subcontractor Distribution"
-                subtitle="Number of users per subcontractor"
+                subtitle="Number of trucks per subcontractor"
               />
               <div className={CLS.chartMd}>
                 <Bar
                   data={getBarChartData(
                     analytics.charts.subconDistribution,
-                    "Users",
+                    "Trucks",
                   )}
                   options={verticalBarOptions}
                 />
@@ -2249,9 +2334,9 @@ const Dashboard = () => {
         )}
 
         {/* ════════════════════════════════════════════════════════════════
-            SUBCONTRACTORS TAB
+            SUBCONTRACTORS TAB — admin & head_admin
         ════════════════════════════════════════════════════════════════ */}
-        {activeTab === "subcons" && isAdmin && (
+        {activeTab === "subcons" && isAnyAdmin && (
           <div className={CLS.tabSection}>
             {/* Subcon stacked bar */}
             <div className={CLS.card}>
@@ -2338,7 +2423,7 @@ const Dashboard = () => {
         )}
 
         {/* ════════════════════════════════════════════════════════════════
-            MY RESOURCES TAB (subcon)
+            MY RESOURCES TAB — subcon only
         ════════════════════════════════════════════════════════════════ */}
         {activeTab === "resources" &&
           isSubcon &&

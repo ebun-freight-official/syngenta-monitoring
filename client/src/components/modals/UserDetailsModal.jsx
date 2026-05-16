@@ -273,7 +273,7 @@ function UserDetailsModal({
                   <div className="flex-1 w-full grid grid-cols-2 items-end place-content-stretch md:gap-y-3 md:gap-x-2">
                     {/* Last Login */}
                     <div className="flex flex-col items-start">
-                      <span className="text-white/50 text-[0.5rem] max-md:text-[0.4rem] uppercase tracking-wider font-semibold mb-0.5">
+                      <span className="text-white/50 text-xxxs max-md:text-[0.4rem] uppercase tracking-wider font-semibold mb-0.5">
                         Last Login
                       </span>
                       <span className="text-white/90 text-xs max-md:text-[0.6rem] font-medium">
@@ -287,7 +287,7 @@ function UserDetailsModal({
 
                     {/* Login Count */}
                     <div className="flex flex-col items-end">
-                      <span className="text-white/50 text-[0.5rem] max-md:text-[0.4rem] uppercase tracking-wider font-semibold mb-0.5">
+                      <span className="text-white/50 text-xxxs max-md:text-[0.4rem] uppercase tracking-wider font-semibold mb-0.5">
                         Logins
                       </span>
                       <span className="text-white/90 text-xs max-md:text-[0.6rem] font-medium">
@@ -297,7 +297,7 @@ function UserDetailsModal({
 
                     {/* Approved / Created */}
                     <div className="flex flex-col items-start">
-                      <span className="text-white/50 text-[0.5rem] max-md:text-[0.4rem] uppercase tracking-wider font-semibold mb-0.5">
+                      <span className="text-white/50 text-xxxs max-md:text-[0.4rem] uppercase tracking-wider font-semibold mb-0.5">
                         {user?.role === "admin" || user?.role === "head_admin"
                           ? "Created"
                           : "Approved"}
@@ -313,7 +313,7 @@ function UserDetailsModal({
 
                     {/* Updated At */}
                     <div className="flex flex-col items-end">
-                      <span className="text-white/50 text-[0.5rem] max-md:text-[0.4rem] uppercase tracking-wider font-semibold mb-0.5">
+                      <span className="text-white/50 text-xxxs max-md:text-[0.4rem] uppercase tracking-wider font-semibold mb-0.5">
                         Updated
                       </span>
                       <span className="text-white/90 text-xs max-md:text-[0.6rem] font-medium">

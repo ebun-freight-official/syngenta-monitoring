@@ -180,13 +180,9 @@ const createDeployment = async (req, res, next) => {
 
     const truck = await Truck.findById(truckId);
     if (!truck) return next(createError(404, "Truck not found"));
-    // if (truck.status === "deployed")
-    //   return next(createError(400, "Truck is already deployed"));
 
     const driver = await Driver.findById(driverId);
     if (!driver) return next(createError(404, "Driver not found"));
-    // if (driver.status === "deployed")
-    //   return next(createError(400, "Driver is already deployed"));
 
     const newDeployment = await Deployment.create({
       pickups: pickups.map(mapPickup),
@@ -278,6 +274,11 @@ const getAllDeployments = async (req, res, next) => {
           : null;
 
     let baseQuery = Deployment.find();
+
+    // ── Company isolation: admins only see their own company's deployments ──
+    if (req.user.role === "admin") {
+      baseQuery = baseQuery.where("company").equals(req.user.company);
+    }
 
     if (includeDeleted !== "true")
       baseQuery = baseQuery.where("isSoftDeleted").ne(true);
@@ -390,6 +391,10 @@ const getAllDeployments = async (req, res, next) => {
 
     const buildCountQuery = () => {
       let q = Deployment.find();
+      // ── Company isolation for count query ──
+      if (req.user.role === "admin") {
+        q = q.where("company").equals(req.user.company);
+      }
       if (includeDeleted !== "true") q = q.where("isSoftDeleted").ne(true);
       if (status && status !== "") q = q.where("status").equals(status);
       q = applyDateRange(q, "createdAt", assignedAtFrom, assignedAtTo, false);
@@ -541,6 +546,19 @@ const updateDeployment = async (req, res, next) => {
 
     if (!existingDeployment)
       return next(createError(404, "Deployment not found"));
+
+    // ── Company isolation: admins can only update deployments in their company ──
+    if (
+      req.user.role === "admin" &&
+      existingDeployment.company !== req.user.company
+    ) {
+      return next(
+        createError(
+          403,
+          "Access denied: deployment belongs to a different company",
+        ),
+      );
+    }
 
     if (departed !== undefined && departed !== null && departed.trim() !== "") {
       const currentIsTMOPrinted =
@@ -1521,6 +1539,16 @@ const softDeleteDeployment = async (req, res, next) => {
       isSoftDeleted: { $ne: true },
     });
     if (!deployment) return next(createError(404, "Deployment not found"));
+
+    // ── Company isolation: admins can only delete deployments in their company ──
+    if (req.user.role === "admin" && deployment.company !== req.user.company) {
+      return next(
+        createError(
+          403,
+          "Access denied: deployment belongs to a different company",
+        ),
+      );
+    }
 
     // Walk replacements array backwards to find the active truck and driver
     const lastTruckReplacement = deployment.replacements
