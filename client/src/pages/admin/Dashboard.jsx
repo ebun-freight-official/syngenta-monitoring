@@ -1307,7 +1307,7 @@ const Dashboard = () => {
                 <select
                   value={selectedCompany}
                   onChange={(e) => setSelectedCompany(e.target.value)}
-                  className="w-full px-3 py-1.5 rounded-md text-xs font-medium border border-gray-200 bg-white text-gray-700 cursor-pointer transition-all"
+                  className="w-full px-2.5 sm:px-3 py-1.5 rounded-md text-xxs sm:text-xs font-medium border border-gray-200 bg-white text-gray-700 cursor-pointer transition-all appearance-none"
                 >
                   <option value="all">All Companies</option>
                   {COMPANY_OPTIONS.map((company) => (
