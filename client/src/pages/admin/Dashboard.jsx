@@ -1257,10 +1257,10 @@ const Dashboard = () => {
     <div className="flex-1 relative overflow-y-auto scrollbar-thin">
       <div className="absolute inset-0 space-y-3 sm:space-y-5 px-0.5">
         {/* ── Page Header ────────────────────────────────────────────────── */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+        <div className="flex items-center lg:items-start justify-between gap-2">
           <div>
             <h1 className="font-semibold xs:text-lg sm:text-xl text-gray-800">
-              Analytics Dashboard
+              <span className="max-lg:hidden">Analytics</span> Dashboard
             </h1>
             <p className="text-xs text-gray-400 mt-0.5 max-sm:hidden">
               Real-time operational insights and performance metrics
@@ -1269,17 +1269,13 @@ const Dashboard = () => {
 
           {/* ── Company Filter — head_admin only ───────────────────────── */}
           {isHeadAdmin && (
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex items-center gap-1.5 text-xs text-gray-500 shrink-0">
-                <HiOutlineOfficeBuilding className="text-sm" />
-                <span className="font-medium">Filter by Company:</span>
-              </div>
-              <div className="flex items-center gap-1 flex-wrap">
+            <>
+              <div className="flex items-center gap-1 flex-wrap max-lg:hidden">
                 {/* "All" pill */}
                 <button
                   onClick={() => setSelectedCompany("all")}
                   className={clsx(
-                    "px-3 py-1.5 rounded-lg text-xs font-medium transition-all border",
+                    "px-3 py-1.5 rounded-md text-xs font-medium transition-all border cursor-pointer",
                     selectedCompany === "all"
                       ? "bg-primaryColor text-white border-primaryColor shadow-sm"
                       : "bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:text-gray-800",
@@ -1294,7 +1290,7 @@ const Dashboard = () => {
                     key={company}
                     onClick={() => setSelectedCompany(company)}
                     className={clsx(
-                      "px-3 py-1.5 rounded-lg text-xs font-medium transition-all border",
+                      "px-3 py-1.5 rounded-md text-xs font-medium transition-all border cursor-pointer",
                       selectedCompany === company
                         ? "bg-primaryColor text-white border-primaryColor shadow-sm"
                         : "bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:text-gray-800",
@@ -1304,27 +1300,26 @@ const Dashboard = () => {
                   </button>
                 ))}
               </div>
-            </div>
+
+              {/* select tag */}
+              {/* select tag */}
+              <div className="lg:hidden">
+                <select
+                  value={selectedCompany}
+                  onChange={(e) => setSelectedCompany(e.target.value)}
+                  className="w-full px-3 py-1.5 rounded-md text-xs font-medium border border-gray-200 bg-white text-gray-700 cursor-pointer transition-all"
+                >
+                  <option value="all">All Companies</option>
+                  {COMPANY_OPTIONS.map((company) => (
+                    <option key={company} value={company}>
+                      {company}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </>
           )}
         </div>
-
-        {/* ── Active company filter badge (non-"all" selection) ───────── */}
-        {isHeadAdmin && selectedCompany !== "all" && (
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500">Showing data for:</span>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primaryColor/10 text-primaryColor text-xs font-semibold border border-primaryColor/20">
-              <HiOutlineOfficeBuilding className="text-sm" />
-              {selectedCompany}
-              <button
-                onClick={() => setSelectedCompany("all")}
-                className="ml-0.5 hover:text-primaryColor/70 transition-colors"
-                aria-label="Clear company filter"
-              >
-                <TbX className="text-sm" />
-              </button>
-            </span>
-          </div>
-        )}
 
         {/* ── Tabs ───────────────────────────────────────────────────────── */}
         <div className="flex border-b border-gray-100 overflow-x-auto scrollbar-hide">
