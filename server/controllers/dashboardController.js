@@ -17,7 +17,6 @@ const getDashboardAnalytics = async (req, res) => {
     const truckAndDriverFilter = { isSoftDeleted: { $ne: true } };
 
     // ── head_admin company filter (from query param) ───────────────────────
-    // Only honoured when req.user.role === "head_admin" and ?company= is set.
     const companyParam =
       req.user.role === "head_admin" && req.query.company
         ? req.query.company
@@ -39,13 +38,16 @@ const getDashboardAnalytics = async (req, res) => {
     // ── Build deployment filter ───────────────────────────────────────────
     // head_admin + company param → filter by company
     // head_admin (no param)      → all deployments
-    // admin                      → only deployments belonging to their company
+    // admin / visitor            → only deployments belonging to their company
     // subcon                     → only deployments whose truck is in their pool
     let deploymentFilter = { ...baseFilter };
 
     if (req.user.role === "head_admin" && companyParam) {
       deploymentFilter.company = companyParam;
-    } else if (req.user.role === "admin" && req.user.company) {
+    } else if (
+      ["admin", "visitor"].includes(req.user.role) &&
+      req.user.company
+    ) {
       deploymentFilter.company = req.user.company;
     } else if (subconTruckIds) {
       deploymentFilter.truckId = { $in: subconTruckIds };
@@ -54,12 +56,12 @@ const getDashboardAnalytics = async (req, res) => {
     // ── Build user filter ─────────────────────────────────────────────────
     // head_admin + company param → filter users by company
     // head_admin (no param)      → all users
-    // admin                      → users scoped to their company
+    // admin / visitor            → users scoped to their company
     const userScopeFilter = {
       isSoftDeleted: { $ne: true },
       ...(companyParam
         ? { company: companyParam }
-        : req.user.role === "admin" && req.user.company
+        : ["admin", "visitor"].includes(req.user.role) && req.user.company
           ? { company: req.user.company }
           : {}),
     };

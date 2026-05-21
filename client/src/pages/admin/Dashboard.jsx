@@ -1302,7 +1302,6 @@ const Dashboard = () => {
               </div>
 
               {/* select tag */}
-              {/* select tag */}
               <div className="lg:hidden">
                 <select
                   value={selectedCompany}

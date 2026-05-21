@@ -262,6 +262,7 @@ const getAllDeployments = async (req, res, next) => {
       territory,
       hybrid,
       flagging,
+      company,
     } = req.query;
 
     if (completedAtFrom || completedAtTo) status = "completed";
@@ -275,9 +276,13 @@ const getAllDeployments = async (req, res, next) => {
 
     let baseQuery = Deployment.find();
 
-    // ── Company isolation: admins only see their own company's deployments ──
-    if (req.user.role === "admin") {
+    // ── Company isolation ──
+    if (["admin", "visitor"].includes(req.user.role)) {
       baseQuery = baseQuery.where("company").equals(req.user.company);
+    }
+
+    if (req.user.role === "head_admin" && company && company !== "") {
+      baseQuery = baseQuery.where("company").equals(company);
     }
 
     if (includeDeleted !== "true")
@@ -391,10 +396,15 @@ const getAllDeployments = async (req, res, next) => {
 
     const buildCountQuery = () => {
       let q = Deployment.find();
+
       // ── Company isolation for count query ──
-      if (req.user.role === "admin") {
+      if (["admin", "visitor"].includes(req.user.role)) {
         q = q.where("company").equals(req.user.company);
       }
+      if (req.user.role === "head_admin" && company && company !== "") {
+        q = q.where("company").equals(company);
+      }
+
       if (includeDeleted !== "true") q = q.where("isSoftDeleted").ne(true);
       if (status && status !== "") q = q.where("status").equals(status);
       q = applyDateRange(q, "createdAt", assignedAtFrom, assignedAtTo, false);

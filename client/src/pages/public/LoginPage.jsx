@@ -6,7 +6,7 @@ import AOS from "aos";
 import "aos/dist/aos.css";
 import { ebun_logo_light } from "../../consts/images";
 
-/* ─── Decorative SVG grid/dot pattern ───────────────────────────────────── */
+/* ─── Decorative SVG dot pattern ───────────────────────────────────────── */
 const DotPattern = () => (
   <svg
     className="absolute inset-0 w-full h-full opacity-10"
@@ -28,7 +28,142 @@ const DotPattern = () => (
   </svg>
 );
 
-/* ─── Stat badge used in the brand panel ────────────────────────────────── */
+/* ─── Freight route graphic — Station › Pickup Site › Destination ───────── */
+const ROUTE_PATH = "M 60 300 C 150 285 150 210 100 188 C 50 166 50 90 145 62";
+
+const MapRouteGraphic = () => (
+  <svg
+    className="absolute right-4 top-1/2 -translate-y-1/2 h-[68%] w-auto opacity-90"
+    viewBox="0 0 220 320"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <defs>
+      <style>{`
+        @keyframes pr {
+          0%   { r: 6;  stroke-opacity: .4; }
+          100% { r: 16; stroke-opacity: 0;  }
+        }
+        @keyframes pr2 {
+          0%   { r: 4;  stroke-opacity: .25; }
+          100% { r: 13; stroke-opacity: 0;   }
+        }
+        .pr    { animation: pr  2.4s ease-out infinite; }
+        .pr2   { animation: pr2 2.4s ease-out infinite 0.45s; }
+        .pr-d  { animation: pr  2.4s ease-out infinite 0.7s; }
+        .pr2-d { animation: pr2 2.4s ease-out infinite 1.1s; }
+      `}</style>
+    </defs>
+
+    {/* Solid low-opacity route line */}
+    <path
+      d={ROUTE_PATH}
+      fill="none"
+      stroke="white"
+      strokeOpacity=".18"
+      strokeWidth="1"
+      strokeLinecap="round"
+    />
+
+    {/* Moving dot — slow */}
+    <circle r="2.2" fill="white" fillOpacity=".92">
+      <animateMotion
+        dur="10s"
+        repeatCount="indefinite"
+        calcMode="spline"
+        keySplines="0.42 0 0.58 1"
+        path={ROUTE_PATH}
+      />
+    </circle>
+
+    {/* ── STATION ────────────────────────────────────────── */}
+    <circle
+      className="pr"
+      cx="60"
+      cy="300"
+      r="6"
+      fill="none"
+      stroke="white"
+      strokeWidth=".7"
+    />
+    <circle
+      className="pr2"
+      cx="60"
+      cy="300"
+      r="4"
+      fill="none"
+      stroke="white"
+      strokeWidth=".4"
+    />
+    <circle cx="60" cy="300" r="2.2" fill="white" fillOpacity=".45" />
+    <circle cx="60" cy="300" r="1.1" fill="white" fillOpacity="1" />
+    <text
+      x="60"
+      y="313"
+      textAnchor="middle"
+      fill="white"
+      fillOpacity=".5"
+      fontSize="5"
+      fontFamily="system-ui,sans-serif"
+      fontWeight="700"
+      letterSpacing="1"
+    >
+      STATION
+    </text>
+
+    {/* ── PICKUP SITE ────────────────────────────────────── */}
+    <circle cx="100" cy="188" r="2.2" fill="white" fillOpacity=".35" />
+    <circle cx="100" cy="188" r="1.1" fill="white" fillOpacity=".85" />
+    <text
+      x="113"
+      y="192"
+      fill="white"
+      fillOpacity=".4"
+      fontSize="4.5"
+      fontFamily="system-ui,sans-serif"
+      fontWeight="600"
+      letterSpacing=".8"
+    >
+      PICKUP SITE
+    </text>
+
+    {/* ── DESTINATION ────────────────────────────────────── */}
+    <circle
+      className="pr-d"
+      cx="145"
+      cy="62"
+      r="6"
+      fill="none"
+      stroke="white"
+      strokeWidth=".7"
+    />
+    <circle
+      className="pr2-d"
+      cx="145"
+      cy="62"
+      r="4"
+      fill="none"
+      stroke="white"
+      strokeWidth=".4"
+    />
+    <circle cx="145" cy="62" r="2.2" fill="white" fillOpacity=".45" />
+    <circle cx="145" cy="62" r="1.1" fill="white" fillOpacity="1" />
+    <text
+      x="145"
+      y="75"
+      textAnchor="middle"
+      fill="white"
+      fillOpacity=".5"
+      fontSize="5"
+      fontFamily="system-ui,sans-serif"
+      fontWeight="700"
+      letterSpacing="1"
+    >
+      DESTINATION
+    </text>
+  </svg>
+);
+
+/* ─── Stat badge ─────────────────────────────────────────────────────────── */
 const StatBadge = ({ value, label }) => (
   <div className="flex flex-col items-center">
     <span className="text-white font-bold text-xl lg:text-2xl leading-none">
@@ -72,6 +207,7 @@ function LoginPage() {
           }}
         >
           <DotPattern />
+          <MapRouteGraphic />
 
           {/* Decorative circle blur */}
           <div
@@ -89,17 +225,17 @@ function LoginPage() {
             }}
           />
 
-          {/* Logo — untouched */}
+          {/* Logo */}
           <div
             data-aos="fade-right"
-            className="relative z-10 flex items-center justify-center gap-3 p-4 sm:p-6 border-b border-white/10 max-sm:pt-0"
+            className="relative z-10 flex items-center max-md:justify-center max-lg:py-6 gap-3 py-4 sm:py-6 border-b border-white/10 max-sm:pt-0"
           >
             <img src={ebun_logo_light} alt="" className="w-10 sm:w-14" />
             <div>
               <h1 className="font-semibold text-3xl sm:text-4xl tracking-widest text-white uppercase">
                 EBUN
               </h1>
-              <p className="max-sm:text-xs text-sm text-white -mt-1.5 uppercase tracking-widest sm:ml-0.5">
+              <p className="max-sm:text-xs text-sm text-white/50 -mt-1.5 uppercase tracking-widest sm:ml-0.5">
                 Freight OPC
               </p>
             </div>
@@ -129,14 +265,14 @@ function LoginPage() {
             className="relative z-10 hidden md:flex items-center gap-5 lg:gap-8
                      border-t border-white/20 pt-5 lg:pt-6"
           >
-            <StatBadge value="Tech" label="Drivern Operations" />
+            <StatBadge value="Tech" label="Driven Operations" />
             <div className="w-px h-7 bg-white/20" />
             <StatBadge value="24/7" label="Operations" />
             <div className="w-px h-7 bg-white/20" />
             <StatBadge value="Est. 2026" label="Founded" />
           </div>
 
-          {/* Mobile: compact tagline only */}
+          {/* Mobile tagline */}
           <p className="relative z-10 md:hidden text-white/60 text-xs italic mt-4 text-center">
             "Where Safety Leads, Technology Drives, and Community Thrives"
           </p>

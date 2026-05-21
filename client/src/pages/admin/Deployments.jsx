@@ -40,6 +40,7 @@ import {
 import PaySlipModal from "../../components/modals/PaySlipModal";
 import PageHeader from "../../components/PageHeader";
 import FilterDropdown from "../../components/ui/FilterDropdown";
+import { COMPANY_OPTIONS } from "../../utils/userOptions";
 
 const defaultFilters = {
   status: "",
@@ -48,6 +49,7 @@ const defaultFilters = {
   territory: "",
   hybrid: "",
   flagging: "",
+  company: "",
   assignedAtFrom: "",
   assignedAtTo: "",
   departedAtFrom: "",
@@ -734,6 +736,23 @@ function Deployments() {
                       ))}
                     </SelectFilter>
                   </>
+                )}
+
+                {userData.data.role === "head_admin" && (
+                  <SelectFilter
+                    label="Company"
+                    name="company"
+                    value={tempFilters.company}
+                    onChange={handleChangeFilter}
+                    colSpan={2}
+                  >
+                    <option value="">All</option>
+                    {COMPANY_OPTIONS.map((item, index) => (
+                      <option key={index} value={item}>
+                        {item}
+                      </option>
+                    ))}
+                  </SelectFilter>
                 )}
 
                 <DateRangeFilter
