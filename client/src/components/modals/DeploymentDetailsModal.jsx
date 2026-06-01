@@ -1459,6 +1459,7 @@ const DeploymentInfoTab = ({
             ).map((t) => ({ id: t._id, label: t.plateNo }))}
             disabled={!isEditMode}
             uppercase
+            required={false}
           />
 
           <div className="grid grid-cols-2 gap-4">
@@ -1472,6 +1473,7 @@ const DeploymentInfoTab = ({
               value={activeTruckType}
               onChange={handleChange}
               disabled={!isEditMode}
+              required={false}
             >
               {settings.trucksDrivers.truckType.map((item, i) => (
                 <option key={i} value={item}>
@@ -1520,6 +1522,7 @@ const DeploymentInfoTab = ({
               label: `${d.firstname} ${d.lastname}`,
             }))}
             disabled={!isEditMode}
+            required={false}
           />
 
           <div className="grid grid-cols-2 gap-4">

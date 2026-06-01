@@ -36,10 +36,6 @@ const getDashboardAnalytics = async (req, res) => {
     }
 
     // ── Build deployment filter ───────────────────────────────────────────
-    // head_admin + company param → filter by company
-    // head_admin (no param)      → all deployments
-    // admin / visitor            → only deployments belonging to their company
-    // subcon                     → only deployments whose truck is in their pool
     let deploymentFilter = { ...baseFilter };
 
     if (req.user.role === "head_admin" && companyParam) {
@@ -54,9 +50,6 @@ const getDashboardAnalytics = async (req, res) => {
     }
 
     // ── Build user filter ─────────────────────────────────────────────────
-    // head_admin + company param → filter users by company
-    // head_admin (no param)      → all users
-    // admin / visitor            → users scoped to their company
     const userScopeFilter = {
       isSoftDeleted: { $ne: true },
       ...(companyParam
@@ -942,6 +935,100 @@ const getDashboardAnalytics = async (req, res) => {
         },
         { $sort: { "_id.year": 1, "_id.month": 1, "_id.week": 1 } },
       ]),
+
+      // ── NEW: Territory detailed breakdown (territory → hybrid + flagging) ──
+      territoryDetailedBreakdownRaw: Deployment.aggregate([
+        { $match: deploymentFilter },
+        { $unwind: "$pickups" },
+        { $match: { "pickups.territory": { $exists: true, $ne: "" } } },
+        {
+          $group: {
+            _id: {
+              territory: "$pickups.territory",
+              hybrid: { $ifNull: ["$pickups.hybrid", "—"] },
+              flagging: { $ifNull: ["$pickups.flagging", "—"] },
+            },
+            totalPickups: { $sum: 1 },
+            completedPickups: {
+              $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] },
+            },
+            ongoingPickups: {
+              $sum: { $cond: [{ $eq: ["$status", "ongoing"] }, 1, 0] },
+            },
+            preparingPickups: {
+              $sum: { $cond: [{ $eq: ["$status", "preparing"] }, 1, 0] },
+            },
+            canceledPickups: {
+              $sum: { $cond: [{ $eq: ["$status", "canceled"] }, 1, 0] },
+            },
+            totalSacks: {
+              $sum: { $ifNull: ["$pickups.sacksCount", 0] },
+            },
+            completedSacks: {
+              $sum: {
+                $cond: [
+                  { $eq: ["$status", "completed"] },
+                  { $ifNull: ["$pickups.sacksCount", 0] },
+                  0,
+                ],
+              },
+            },
+            totalEstWeight: {
+              $sum: {
+                $convert: {
+                  input: "$pickups.estimatedWeightKg",
+                  to: "double",
+                  onError: 0,
+                  onNull: 0,
+                },
+              },
+            },
+            totalFieldWeight: {
+              $sum: {
+                $convert: {
+                  input: "$pickups.fieldWeightKg",
+                  to: "double",
+                  onError: 0,
+                  onNull: 0,
+                },
+              },
+            },
+            totalPlantWeight: {
+              $sum: {
+                $convert: {
+                  input: "$pickups.plantWeightKg",
+                  to: "double",
+                  onError: 0,
+                  onNull: 0,
+                },
+              },
+            },
+            completedPlantWeight: {
+              $sum: {
+                $cond: [
+                  { $eq: ["$status", "completed"] },
+                  {
+                    $convert: {
+                      input: "$pickups.plantWeightKg",
+                      to: "double",
+                      onError: 0,
+                      onNull: 0,
+                    },
+                  },
+                  0,
+                ],
+              },
+            },
+          },
+        },
+        {
+          $sort: {
+            "_id.territory": 1,
+            "_id.hybrid": 1,
+            "_id.flagging": 1,
+          },
+        },
+      ]),
     };
 
     const results = await Promise.all(Object.values(promises));
@@ -1060,6 +1147,86 @@ const getDashboardAnalytics = async (req, res) => {
       processedFlaggingPerformance,
     );
 
+    // ── Build territoryDetailedBreakdown ──────────────────────────────────
+    const formatArrayData = (array, fallback = []) =>
+      Array.isArray(array) && array.length > 0 ? array : fallback;
+
+    const territoryMap = {};
+    formatArrayData(data.territoryDetailedBreakdownRaw).forEach((row) => {
+      const { territory, hybrid, flagging } = row._id;
+      if (!territory) return;
+
+      if (!territoryMap[territory]) {
+        territoryMap[territory] = { territory, hybrids: [] };
+      }
+
+      const total = row.totalPickups || 0;
+
+      territoryMap[territory].hybrids.push({
+        hybrid: hybrid || "—",
+        flagging: flagging || "—",
+        totalPickups: total,
+        completedPickups: row.completedPickups || 0,
+        ongoingPickups: row.ongoingPickups || 0,
+        preparingPickups: row.preparingPickups || 0,
+        canceledPickups: row.canceledPickups || 0,
+        completionRate:
+          total > 0 ? ((row.completedPickups / total) * 100).toFixed(1) : "0",
+        totalSacks: row.totalSacks || 0,
+        completedSacks: row.completedSacks || 0,
+        avgSacks:
+          total > 0
+            ? parseFloat(((row.totalSacks || 0) / total).toFixed(1))
+            : 0,
+        totalEstWeight: parseFloat((row.totalEstWeight || 0).toFixed(2)),
+        totalFieldWeight: parseFloat((row.totalFieldWeight || 0).toFixed(2)),
+        totalPlantWeight: parseFloat((row.totalPlantWeight || 0).toFixed(2)),
+        completedPlantWeight: parseFloat(
+          (row.completedPlantWeight || 0).toFixed(2),
+        ),
+        avgPlantWeight:
+          total > 0
+            ? parseFloat(((row.totalPlantWeight || 0) / total).toFixed(2))
+            : 0,
+      });
+    });
+
+    // Compute territory-level totals and sort territories alphabetically
+    const territoryDetailedBreakdown = Object.values(territoryMap)
+      .map((t) => {
+        const h = t.hybrids;
+        const sumField = (fn) => h.reduce((acc, r) => acc + fn(r), 0);
+
+        const totalPickups = sumField((r) => r.totalPickups);
+        const completedPickups = sumField((r) => r.completedPickups);
+
+        t.totals = {
+          totalPickups,
+          completedPickups,
+          completionRate:
+            totalPickups > 0
+              ? ((completedPickups / totalPickups) * 100).toFixed(1)
+              : "0",
+          totalSacks: sumField((r) => r.totalSacks),
+          completedSacks: sumField((r) => r.completedSacks),
+          totalEstWeight: parseFloat(
+            sumField((r) => r.totalEstWeight).toFixed(2),
+          ),
+          totalFieldWeight: parseFloat(
+            sumField((r) => r.totalFieldWeight).toFixed(2),
+          ),
+          totalPlantWeight: parseFloat(
+            sumField((r) => r.totalPlantWeight).toFixed(2),
+          ),
+          completedPlantWeight: parseFloat(
+            sumField((r) => r.completedPlantWeight).toFixed(2),
+          ),
+        };
+
+        return t;
+      })
+      .sort((a, b) => a.territory.localeCompare(b.territory));
+
     // ── Derived metrics ───────────────────────────────────────────────────
     const totalDeployments = data.totalDeployments;
 
@@ -1111,9 +1278,6 @@ const getDashboardAnalytics = async (req, res) => {
 
     const totalOngoingDeployments =
       (data.preparingDeployments || 0) + (data.ongoingDeployments || 0);
-
-    const formatArrayData = (array, fallback = []) =>
-      Array.isArray(array) && array.length > 0 ? array : fallback;
 
     const weeklyTrendsData = formatArrayData(
       data.weeklyDeploymentStatusAnalytics,
@@ -1627,6 +1791,9 @@ const getDashboardAnalytics = async (req, res) => {
         hybridCount: formatArrayData(data.hybridAnalytics).length || 0,
         flaggingCount: formatArrayData(data.flaggingAnalytics).length || 0,
       },
+
+      // ── NEW: Territory detailed breakdown ──────────────────────────────
+      territoryDetailedBreakdown,
 
       // ── Expose the active company filter to the client ─────────────────
       activeCompanyFilter: companyParam || null,

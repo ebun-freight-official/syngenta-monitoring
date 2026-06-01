@@ -521,6 +521,7 @@ function CreateDeploymentModal({ isOpen, onClose, onCreate, trucks, drivers }) {
                         allOptions={truckAllOptions}
                         options={filteredTrucks}
                         uppercase
+                        required={false}
                       />
 
                       <ComboboxField
@@ -532,6 +533,7 @@ function CreateDeploymentModal({ isOpen, onClose, onCreate, trucks, drivers }) {
                         onQueryChange={setDriverQuery}
                         allOptions={driverAllOptions}
                         options={filteredDrivers}
+                        required={false}
                       />
 
                       <SelectField

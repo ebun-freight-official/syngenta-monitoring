@@ -10,6 +10,12 @@ const validateDeploymentTimeline = require("../utils/validateDeploymentTimeline"
 
 const MANILA_TZ = "Asia/Manila";
 
+// Safe ID comparison — handles null/undefined on either side without throwing
+const sameId = (a, b) => {
+  if (!a || !b) return false;
+  return a.toString() === b.toString();
+};
+
 // ─── Replacement helpers ───────────────────────────────────────────────────────
 
 // Returns the latest populated replacement truck (populated or raw ObjectId)
@@ -138,9 +144,9 @@ const createDeployment = async (req, res, next) => {
     const company =
       req.user.role === "head_admin" ? req.body.company : req.user.company;
 
+    // truckId and driverId are intentionally NOT required here —
+    // a deployment can be created without a truck/driver and assigned later.
     validateFields({
-      truckId,
-      driverId,
       truckType,
       helperCount,
       destination,
@@ -178,16 +184,24 @@ const createDeployment = async (req, res, next) => {
       return next(createError(400, timelineErrors.join(", ")));
     }
 
-    const truck = await Truck.findById(truckId);
-    if (!truck) return next(createError(404, "Truck not found"));
+    // Only look up truck/driver if they were provided
+    let truck = null;
+    let driver = null;
 
-    const driver = await Driver.findById(driverId);
-    if (!driver) return next(createError(404, "Driver not found"));
+    if (truckId) {
+      truck = await Truck.findById(truckId);
+      if (!truck) return next(createError(404, "Truck not found"));
+    }
+
+    if (driverId) {
+      driver = await Driver.findById(driverId);
+      if (!driver) return next(createError(404, "Driver not found"));
+    }
 
     const newDeployment = await Deployment.create({
       pickups: pickups.map(mapPickup),
-      truckId,
-      driverId,
+      truckId: truckId || undefined,
+      driverId: driverId || undefined,
       truckType,
       helperCount,
       destination,
@@ -204,10 +218,17 @@ const createDeployment = async (req, res, next) => {
       company,
     });
 
-    await Promise.all([
-      Truck.findByIdAndUpdate(truckId, { status: "deployed" }),
-      Driver.findByIdAndUpdate(driverId, { status: "deployed" }),
-    ]);
+    // Only update truck/driver status if they were assigned
+    const statusUpdates = [];
+    if (truck)
+      statusUpdates.push(
+        Truck.findByIdAndUpdate(truckId, { status: "deployed" }),
+      );
+    if (driver)
+      statusUpdates.push(
+        Driver.findByIdAndUpdate(driverId, { status: "deployed" }),
+      );
+    if (statusUpdates.length > 0) await Promise.all(statusUpdates);
 
     const initialStatus = departed ? "ongoing" : "preparing";
 
@@ -219,12 +240,14 @@ const createDeployment = async (req, res, next) => {
       targetDeployment: newDeployment._id,
     });
 
+    const truckLabel = truck
+      ? truck.plateNo.toUpperCase()
+      : "No truck assigned";
+
     await ActivityLog.create({
       type: "deployment",
       performedBy: req.user._id,
-      action: `${
-        newDeployment.deploymentCode
-      }: Assigned ${truck.plateNo.toUpperCase()} to deployment`,
+      action: `${newDeployment.deploymentCode}: Deployment created — ${truckLabel}`,
       targetDeployment: newDeployment._id,
     });
 
@@ -605,8 +628,8 @@ const updateDeployment = async (req, res, next) => {
 
     const originalValues = {
       pickups: existingDeployment.pickups,
-      truckId: existingDeployment.truckId?.toString(),
-      driverId: existingDeployment.driverId?.toString(),
+      truckId: existingDeployment.truckId?.toString() ?? "",
+      driverId: existingDeployment.driverId?.toString() ?? "",
       truckType: existingDeployment.truckType,
       helperCount: existingDeployment.helperCount,
       destination: existingDeployment.destination,
@@ -621,9 +644,10 @@ const updateDeployment = async (req, res, next) => {
       cancellationReason: existingDeployment.cancellationReason,
       isTMOPrinted: existingDeployment.isTMOPrinted,
       isPaySlipPrinted: existingDeployment.isPaySlipPrinted,
-      replacementTruckId: lastTruckReplacement?.replacementTruckId?.toString(),
+      replacementTruckId:
+        lastTruckReplacement?.replacementTruckId?.toString() ?? "",
       replacementDriverId:
-        lastDriverReplacement?.replacementDriverId?.toString(),
+        lastDriverReplacement?.replacementDriverId?.toString() ?? "",
     };
 
     const originalStatus = existingDeployment.status;
@@ -656,13 +680,13 @@ const updateDeployment = async (req, res, next) => {
       const isNewTruckReplacement =
         replacementTruckId &&
         (!hasExistingReplacement ||
-          lastTruckReplacement.replacementTruckId.toString() !==
+          (lastTruckReplacement.replacementTruckId?.toString() ?? "") !==
             replacementTruckId.toString());
 
       const isNewDriverReplacement =
         replacementDriverId &&
         (!hasExistingDriverReplacement ||
-          lastDriverReplacement.replacementDriverId.toString() !==
+          (lastDriverReplacement.replacementDriverId?.toString() ?? "") !==
             replacementDriverId.toString());
 
       // ── Truck side ────────────────────────────────────────────────────────
@@ -671,7 +695,9 @@ const updateDeployment = async (req, res, next) => {
 
         const [newTruck, oldTruck, oldReplacementTruck] = await Promise.all([
           Truck.findById(replacementTruckId),
-          Truck.findById(existingDeployment.truckId),
+          existingDeployment.truckId
+            ? Truck.findById(existingDeployment.truckId)
+            : Promise.resolve(null),
           hasExistingReplacement
             ? Truck.findById(lastTruckReplacement.replacementTruckId)
             : Promise.resolve(null),
@@ -702,7 +728,7 @@ const updateDeployment = async (req, res, next) => {
             }),
           );
         }
-        if (!hasExistingReplacement) {
+        if (!hasExistingReplacement && existingDeployment.truckId) {
           truckUpdates.push(
             Truck.findByIdAndUpdate(existingDeployment.truckId, {
               status: "available",
@@ -727,7 +753,7 @@ const updateDeployment = async (req, res, next) => {
           Driver.findById(replacementDriverId),
           existingDeployment.driverId
             ? Driver.findById(existingDeployment.driverId)
-            : null,
+            : Promise.resolve(null),
           hasExistingDriverReplacement
             ? Driver.findById(lastDriverReplacement.replacementDriverId)
             : Promise.resolve(null),
@@ -759,7 +785,7 @@ const updateDeployment = async (req, res, next) => {
             ),
           );
         }
-        if (!hasExistingDriverReplacement) {
+        if (!hasExistingDriverReplacement && existingDeployment.driverId) {
           driverUpdates.push(
             Driver.findByIdAndUpdate(existingDeployment.driverId, {
               status: "available",
@@ -817,14 +843,17 @@ const updateDeployment = async (req, res, next) => {
     }
 
     // ── Regular truck/driver change (non-replacement) ─────────────────────
+    // Only log/act when both: a new value was provided AND it differs from current
     if (
-      extractedTruckId &&
-      extractedTruckId.toString() !== originalValues.truckId &&
+      extractedTruckId != null &&
+      extractedTruckId.toString() !== (originalValues.truckId ?? "") &&
       !performedReplacement
     ) {
       const [newTruck, oldTruck] = await Promise.all([
         Truck.findById(extractedTruckId),
-        Truck.findById(originalValues.truckId),
+        originalValues.truckId
+          ? Truck.findById(originalValues.truckId)
+          : Promise.resolve(null),
       ]);
       if (newTruck) {
         await createReplacementTimelineLog(
@@ -834,13 +863,15 @@ const updateDeployment = async (req, res, next) => {
     }
 
     if (
-      extractedDriverId &&
-      extractedDriverId.toString() !== originalValues.driverId &&
+      extractedDriverId != null &&
+      extractedDriverId.toString() !== (originalValues.driverId ?? "") &&
       !performedDriverReplacement
     ) {
       const [newDriver, oldDriver] = await Promise.all([
         Driver.findById(extractedDriverId),
-        Driver.findById(originalValues.driverId),
+        originalValues.driverId
+          ? Driver.findById(originalValues.driverId)
+          : Promise.resolve(null),
       ]);
       if (newDriver) {
         const oldName = oldDriver
@@ -894,11 +925,13 @@ const updateDeployment = async (req, res, next) => {
 
     const currentActiveTruckId =
       updatedLastTruckReplacement?.replacementTruckId ||
-      existingDeployment.truckId;
+      existingDeployment.truckId ||
+      (extractedTruckId ? extractedTruckId : null);
 
     const currentActiveDriverId =
       updatedLastDriverReplacement?.replacementDriverId ||
-      existingDeployment.driverId;
+      existingDeployment.driverId ||
+      (extractedDriverId ? extractedDriverId : null);
 
     // ── Status-based truck/driver availability ────────────────────────────
     const statusUpdates = [];
@@ -923,7 +956,7 @@ const updateDeployment = async (req, res, next) => {
         currentActiveTruckId &&
         !performedReplacement &&
         (!hasExistingReplacement ||
-          currentActiveTruckId.toString() !== originalValues.truckId)
+          currentActiveTruckId.toString() !== (originalValues.truckId ?? "")) // ✅ null-safe
       ) {
         statusUpdates.push(
           Truck.findByIdAndUpdate(currentActiveTruckId, { status: "deployed" }),
@@ -933,7 +966,7 @@ const updateDeployment = async (req, res, next) => {
         currentActiveDriverId &&
         !performedDriverReplacement &&
         (!hasExistingDriverReplacement ||
-          currentActiveDriverId.toString() !== originalValues.driverId)
+          currentActiveDriverId.toString() !== (originalValues.driverId ?? "")) // ✅ null-safe
       ) {
         statusUpdates.push(
           Driver.findByIdAndUpdate(currentActiveDriverId, {
@@ -947,7 +980,7 @@ const updateDeployment = async (req, res, next) => {
     // ── Truck/driver swap (non-replacement) ───────────────────────────────
     if (
       extractedTruckId &&
-      extractedTruckId.toString() !== originalValues.truckId &&
+      extractedTruckId.toString() !== (originalValues.truckId ?? "") && // ✅ null-safe
       !hasExistingReplacement &&
       !performedReplacement
     ) {
@@ -968,7 +1001,7 @@ const updateDeployment = async (req, res, next) => {
 
     if (
       extractedDriverId &&
-      extractedDriverId.toString() !== originalValues.driverId &&
+      extractedDriverId.toString() !== (originalValues.driverId ?? "") && // ✅ null-safe
       !hasExistingDriverReplacement &&
       !performedDriverReplacement
     ) {
@@ -1059,8 +1092,8 @@ const updateDeployment = async (req, res, next) => {
     );
 
     Object.assign(existingDeployment, {
-      truckId: extractedTruckId || existingDeployment.truckId,
-      driverId: extractedDriverId || existingDeployment.driverId,
+      ...(extractedTruckId != null && { truckId: extractedTruckId }),
+      ...(extractedDriverId != null && { driverId: extractedDriverId }),
       truckType:
         truckType !== undefined ? truckType : existingDeployment.truckType,
       helperCount:
@@ -1422,27 +1455,47 @@ const updateDeployment = async (req, res, next) => {
     }
 
     if (
-      extractedTruckId !== undefined &&
-      extractedTruckId.toString() !== originalValues.truckId &&
+      extractedTruckId != null &&
+      extractedTruckId.toString() !== (originalValues.truckId ?? "") &&
       !performedReplacement
     ) {
       const newTruck = await Truck.findById(extractedTruckId);
-      await createActivityLog(
-        `Truck changed to ${(newTruck?.plateNo || "Unknown").toUpperCase()}`,
-      );
+      // First-time assignment (deployment had no truck before)
+      if (!originalValues.truckId) {
+        await createActivityLog(
+          `Truck assigned: ${(newTruck?.plateNo || "Unknown").toUpperCase()}`,
+        );
+      } else {
+        await createActivityLog(
+          `Truck changed to ${(newTruck?.plateNo || "Unknown").toUpperCase()}`,
+        );
+      }
     }
 
     if (
-      extractedDriverId !== undefined &&
-      extractedDriverId.toString() !== originalValues.driverId &&
+      extractedDriverId != null &&
+      extractedDriverId.toString() !== (originalValues.driverId ?? "") &&
       !performedDriverReplacement
     ) {
       const newDriver = await Driver.findById(extractedDriverId);
-      await createActivityLog(
-        `Driver changed to ${
-          newDriver ? `${newDriver.firstname} ${newDriver.lastname}` : "Unknown"
-        }`,
-      );
+      // First-time assignment (deployment had no driver before)
+      if (!originalValues.driverId) {
+        await createActivityLog(
+          `Driver assigned: ${
+            newDriver
+              ? `${newDriver.firstname} ${newDriver.lastname}`
+              : "Unknown"
+          }`,
+        );
+      } else {
+        await createActivityLog(
+          `Driver changed to ${
+            newDriver
+              ? `${newDriver.firstname} ${newDriver.lastname}`
+              : "Unknown"
+          }`,
+        );
+      }
     }
 
     if (truckType !== undefined && truckType !== originalValues.truckType)
@@ -1533,7 +1586,6 @@ const updateDeployment = async (req, res, next) => {
     next(error);
   }
 };
-
 // ─── Soft delete deployment ────────────────────────────────────────────────────
 
 const softDeleteDeployment = async (req, res, next) => {
@@ -1576,6 +1628,7 @@ const softDeleteDeployment = async (req, res, next) => {
     const activeDriverId =
       lastDriverReplacement?.replacementDriverId || deployment.driverId;
 
+    // Only update status if truck/driver are actually assigned
     await Promise.all(
       [
         activeTruckId &&

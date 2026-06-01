@@ -320,6 +320,60 @@ const SelectFilter = ({ label, name, value, onChange, colSpan, children }) => (
   </div>
 );
 
+/* ── Truck Details Cell ───────────────────────────────────────────────────── */
+// Safely renders truck plate + type + driver name.
+// Falls back to "—" placeholders when truck or driver is not yet assigned.
+const TruckDetailsCell = ({ deployment }) => {
+  // Determine the active (possibly replacement) truck and driver
+  const activeReplacement = deployment.replacements
+    ?.slice()
+    .reverse()
+    .find((r) => r.replacementTruckId);
+
+  const activeTruck =
+    activeReplacement?.replacementTruckId || deployment.truckId;
+  const activeDriver =
+    activeReplacement?.replacementDriverId || deployment.driverId;
+  const activeTruckType =
+    activeReplacement?.replacementTruckType || deployment.truckType;
+
+  const plateNo = activeTruck?.plateNo;
+  const driverName =
+    activeDriver?.firstname && activeDriver?.lastname
+      ? `${activeDriver.firstname} ${activeDriver.lastname}`
+      : null;
+
+  return (
+    <div className="space-y-0.5">
+      <p className="text-nowrap">
+        {plateNo ? (
+          <>
+            <span className="uppercase font-medium max-xs:text-xxs">
+              {plateNo}{" "}
+            </span>
+            {activeTruckType && (
+              <span className="text-gray-400 max-xs:text-xxs">
+                ({activeTruckType})
+              </span>
+            )}
+          </>
+        ) : (
+          <span className="italic text-gray-400 font-light text-xxs sm:text-xs">
+            No truck assigned
+          </span>
+        )}
+      </p>
+      <p className="text-nowrap text-gray-500 font-light max-sm:text-xxs">
+        {driverName ?? (
+          <span className="italic text-gray-400 font-light text-xxs sm:text-xs">
+            No driver assigned
+          </span>
+        )}
+      </p>
+    </div>
+  );
+};
+
 function Deployments() {
   const { userData } = useUserContext();
   const { settings } = useSettingsContext();
@@ -938,42 +992,9 @@ function Deployments() {
                         </div>
                       </td>
 
+                      {/* ── Truck Details ── */}
                       <td>
-                        <div className="space-y-0.5">
-                          {deployment?.replacement?.replacementTruckId?._id ? (
-                            <>
-                              <p className="text-nowrap">
-                                <span className="uppercase font-medium max-xs:text-xxs">
-                                  {
-                                    deployment.replacement.replacementTruckId
-                                      .plateNo
-                                  }{" "}
-                                </span>
-                                <span className="text-gray-400 max-xs:text-xxs">
-                                  ({deployment.replacement.replacementTruckType}
-                                  )
-                                </span>
-                              </p>
-                              <p className="text-nowrap text-gray-500 font-light max-sm:text-xxs">
-                                {`${deployment.replacement.replacementDriverId.firstname} ${deployment.replacement.replacementDriverId.lastname}`}
-                              </p>
-                            </>
-                          ) : (
-                            <>
-                              <p className="text-nowrap">
-                                <span className="uppercase font-medium max-xs:text-xxs">
-                                  {deployment.truckId.plateNo}{" "}
-                                </span>
-                                <span className="text-gray-400 max-xs:text-xxs">
-                                  ({deployment.truckType})
-                                </span>
-                              </p>
-                              <p className="text-nowrap text-gray-500 font-light max-sm:text-xxs">
-                                {`${deployment.driverId.firstname} ${deployment.driverId.lastname}`}
-                              </p>
-                            </>
-                          )}
-                        </div>
+                        <TruckDetailsCell deployment={deployment} />
                       </td>
 
                       {/* ── Status + Progress Bar + Description ── */}

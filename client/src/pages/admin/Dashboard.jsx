@@ -33,6 +33,8 @@ import {
   HiOutlineBeaker,
   HiOutlineFlag,
   HiOutlineOfficeBuilding,
+  HiOutlineChevronDown,
+  HiOutlineChevronUp,
 } from "react-icons/hi";
 import {
   TbRocket,
@@ -95,6 +97,23 @@ const Dashboard = () => {
   const [activeTab, setActiveTab] = useState("overview");
   const [trendPeriod, setTrendPeriod] = useState("weekly");
   const [weightPeriod, setWeightPeriod] = useState("weekly");
+
+  // ── Territory accordion expand state ─────────────────────────────────────
+  const [expandedTerritories, setExpandedTerritories] = useState({});
+  const toggleTerritory = (territory) => {
+    setExpandedTerritories((prev) => ({
+      ...prev,
+      [territory]: !prev[territory],
+    }));
+  };
+  const expandAllTerritories = () => {
+    const all = {};
+    analytics?.territoryDetailedBreakdown?.forEach((t) => {
+      all[t.territory] = true;
+    });
+    setExpandedTerritories(all);
+  };
+  const collapseAllTerritories = () => setExpandedTerritories({});
 
   // ── Company filter — head_admin only ─────────────────────────────────────
   const [selectedCompany, setSelectedCompany] = useState("all");
@@ -159,7 +178,6 @@ const Dashboard = () => {
     yellow: "#f59e0b",
   };
 
-  // ── Fetch whenever selectedCompany changes (head_admin only) ─────────────
   useEffect(() => {
     fetchAnalyticsData();
   }, [selectedCompany]);
@@ -169,7 +187,6 @@ const Dashboard = () => {
       setLoading(true);
       const token = sessionStorage.getItem("userToken");
 
-      // Build query params — only send company when a specific one is selected
       const params = {};
       if (selectedCompany && selectedCompany !== "all") {
         params.company = selectedCompany;
@@ -1120,7 +1137,6 @@ const Dashboard = () => {
     "red-600": { text: "text-red-600", bg: "bg-red-100/50" },
   };
 
-  // ─── MetricCard (desktop) ─────────────────────────────────────────────────
   const MetricCard = ({
     icon: Icon,
     title,
@@ -1164,7 +1180,6 @@ const Dashboard = () => {
     );
   };
 
-  // ─── MetricCard (mobile) ──────────────────────────────────────────────────
   const MetricCardMobile = ({ icon: Icon, title, value, subtitle, color }) => {
     const c = colorMap[color] || { text: "text-gray-600", bg: "bg-gray-100" };
     return (
@@ -1191,7 +1206,6 @@ const Dashboard = () => {
     );
   };
 
-  // ─── Reusable CardHeader ──────────────────────────────────────────────────
   const CardHeader = ({ title, subtitle }) => (
     <div className={CLS.cardHeader}>
       <h2 className={CLS.cardTitle}>{title}</h2>
@@ -1199,7 +1213,6 @@ const Dashboard = () => {
     </div>
   );
 
-  // ─── ScrollableChart ──────────────────────────────────────────────────────
   const ScrollableChart = ({
     heightClass,
     minWidth = "500px",
@@ -1215,7 +1228,6 @@ const Dashboard = () => {
     </div>
   );
 
-  // ─── Shared Table Styles ──────────────────────────────────────────────────
   const statusBadge = (status) => {
     const map = {
       available: "bg-green-100 text-green-800",
@@ -1231,6 +1243,161 @@ const Dashboard = () => {
     return "bg-red-100 text-red-800";
   };
 
+  const flaggingBadge = (flagging) => {
+    const l = (flagging || "").toLowerCase();
+    if (l.includes("green")) return "bg-green-100 text-green-800";
+    if (l.includes("red")) return "bg-red-100 text-red-800";
+    if (l.includes("orange")) return "bg-orange-100 text-orange-800";
+    if (l.includes("yellow")) return "bg-yellow-100 text-yellow-800";
+    return "bg-gray-100 text-gray-600";
+  };
+
+  // ─── Territory Detailed Breakdown Component ───────────────────────────────
+  const TerritoryDetailedBreakdown = () => {
+    const breakdown = analytics?.territoryDetailedBreakdown;
+
+    if (!breakdown?.length) {
+      return (
+        <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+          <p className="text-sm font-medium">No territory data available</p>
+          <p className="text-xs mt-1">Deployments will appear here</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-3 max-h-[600px] overflow-y-auto scrollbar-thin pr-1">
+        {breakdown.map((territory) => {
+          const totalPickups = territory.hybrids.reduce(
+            (sum, row) => sum + (row.totalPickups || 0),
+            0,
+          );
+          const totalSacks = territory.hybrids.reduce(
+            (sum, row) => sum + (row.totalSacks || 0),
+            0,
+          );
+          const totalFieldWeight = territory.hybrids.reduce(
+            (sum, row) => sum + (row.totalFieldWeight || 0),
+            0,
+          );
+          const totalPlantWeight = territory.hybrids.reduce(
+            (sum, row) => sum + (row.totalPlantWeight || 0),
+            0,
+          );
+          const avgCompletion =
+            territory.hybrids.length > 0
+              ? (
+                  territory.hybrids.reduce(
+                    (sum, row) => sum + parseFloat(row.completionRate || 0),
+                    0,
+                  ) / territory.hybrids.length
+                ).toFixed(1)
+              : "0";
+          const avgNum = parseFloat(avgCompletion);
+
+          return (
+            <div
+              key={territory.territory}
+              className="border border-gray-200 rounded-lg overflow-hidden"
+            >
+              {/* Territory Label */}
+              <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-gray-50 border-b border-gray-200">
+                <div className="flex items-center gap-3">
+                  <span className="text-xs sm:text-sm font-semibold text-gray-800 capitalize">
+                    {territory.territory}
+                  </span>
+                </div>
+              </div>
+
+              {/* Table */}
+              <div className="overflow-x-auto scrollbar-thin">
+                <table className="min-w-full border-collapse">
+                  <thead>
+                    <tr className="border-b border-gray-200 text-gray-500 text-xxs uppercase tracking-wide">
+                      <th className="px-4 py-2 text-left font-semibold whitespace-nowrap">
+                        Hybrid
+                      </th>
+                      <th className="px-4 py-2 text-left font-semibold whitespace-nowrap">
+                        Pickups
+                      </th>
+                      <th className="px-4 py-2 text-left font-semibold whitespace-nowrap">
+                        Done %
+                      </th>
+                      <th className="px-4 py-2 text-left font-semibold whitespace-nowrap">
+                        Sacks
+                      </th>
+                      <th className="px-4 py-2 text-left font-semibold whitespace-nowrap">
+                        Est. Wt.
+                      </th>
+                      <th className="px-4 py-2 text-left font-semibold whitespace-nowrap">
+                        Field Wt.
+                      </th>
+                      <th className="px-4 py-2 text-left font-semibold whitespace-nowrap">
+                        Plant Wt.
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {territory.hybrids.map((row, idx) => {
+                      const rateNum = parseFloat(row.completionRate);
+                      return (
+                        <tr
+                          key={`${row.hybrid}-${idx}`}
+                          className="border-b border-gray-100 last:border-none hover:bg-gray-50 transition-colors"
+                        >
+                          <td className="px-4 py-2.5 whitespace-nowrap text-xxs sm:text-xs text-gray-600">
+                            {row.hybrid === "—" ? (
+                              <span className="italic text-gray-400 font-light">
+                                None
+                              </span>
+                            ) : (
+                              row.hybrid
+                                .replace(/_/g, " ")
+                                .replace(/\b\w/g, (c) => c.toUpperCase())
+                            )}
+                          </td>
+                          <td className="px-4 py-2.5 whitespace-nowrap text-xxs sm:text-xs text-gray-600">
+                            {row.totalPickups.toLocaleString()}
+                          </td>
+                          <td className="px-4 py-2.5 whitespace-nowrap">
+                            <span
+                              className={clsx(
+                                "px-2 py-0.5 rounded-full text-xxs font-medium",
+                                rateNum >= 80
+                                  ? "bg-green-50 text-green-700"
+                                  : rateNum >= 60
+                                    ? "bg-yellow-50 text-yellow-700"
+                                    : "bg-red-50 text-red-600",
+                              )}
+                            >
+                              {row.completionRate}%
+                            </span>
+                          </td>
+                          <td className="px-4 py-2.5 whitespace-nowrap text-xxs sm:text-xs text-gray-600">
+                            {row.totalSacks.toLocaleString()}
+                          </td>
+                          <td className="px-4 py-2.5 whitespace-nowrap text-xxs sm:text-xs text-gray-600">
+                            {row.totalEstWeight.toLocaleString()}
+                          </td>
+                          <td className="px-4 py-2.5 whitespace-nowrap text-xxs sm:text-xs text-gray-600">
+                            {row.totalFieldWeight.toLocaleString()}
+                          </td>
+                          <td className="px-4 py-2.5 whitespace-nowrap text-xxs sm:text-xs text-gray-600">
+                            {row.totalPlantWeight.toLocaleString()}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   // ─── Loading / Error states ───────────────────────────────────────────────
   if (loading || userData.isLoading) {
     return <TableLoading />;
@@ -1242,14 +1409,12 @@ const Dashboard = () => {
 
   const userRole = userData.data?.role;
 
-  // ── Role flags ────────────────────────────────────────────────────────────
   const isHeadAdmin = userRole === "head_admin";
   const isAdmin = userRole === "admin";
   const isAnyAdmin = isHeadAdmin || isAdmin;
   const isSubcon = userRole === "subcon";
   const isVisitor = userRole === "visitor";
 
-  // ── Company filter label ──────────────────────────────────────────────────
   const companyFilterLabel =
     selectedCompany === "all" ? "All Companies" : selectedCompany;
 
@@ -1267,11 +1432,9 @@ const Dashboard = () => {
             </p>
           </div>
 
-          {/* ── Company Filter — head_admin only ───────────────────────── */}
           {isHeadAdmin && (
             <>
               <div className="flex items-center gap-1 flex-wrap max-lg:hidden">
-                {/* "All" pill */}
                 <button
                   onClick={() => setSelectedCompany("all")}
                   className={clsx(
@@ -1283,8 +1446,6 @@ const Dashboard = () => {
                 >
                   All
                 </button>
-
-                {/* One pill per company */}
                 {COMPANY_OPTIONS.map((company) => (
                   <button
                     key={company}
@@ -1300,8 +1461,6 @@ const Dashboard = () => {
                   </button>
                 ))}
               </div>
-
-              {/* select tag */}
               <div className="lg:hidden">
                 <select
                   value={selectedCompany}
@@ -1329,11 +1488,7 @@ const Dashboard = () => {
               label: "Deployment Details",
               show: isAnyAdmin || isVisitor,
             },
-            {
-              key: "users",
-              label: "Users",
-              show: isHeadAdmin,
-            },
+            { key: "users", label: "Users", show: isHeadAdmin },
             { key: "subcons", label: "Subcontractors", show: isAnyAdmin },
             { key: "resources", label: "My Resources", show: isSubcon },
           ]
@@ -1372,9 +1527,7 @@ const Dashboard = () => {
                   analytics.performanceMetrics.totalDeployments?.toLocaleString() ||
                   "0"
                 }
-                subtitle={`${
-                  analytics.performanceMetrics.monthlyDeployments || 0
-                } this month`}
+                subtitle={`${analytics.performanceMetrics.monthlyDeployments || 0} this month`}
                 color="blue-600"
               />
               <MetricCard
@@ -1384,9 +1537,7 @@ const Dashboard = () => {
                   analytics.performanceMetrics.completedDeployments?.toLocaleString() ||
                   "0"
                 }
-                subtitle={`${
-                  analytics.performanceMetrics.successRate || 0
-                }% success rate`}
+                subtitle={`${analytics.performanceMetrics.successRate || 0}% success rate`}
                 color="green-600"
               />
               <MetricCard
@@ -1396,9 +1547,7 @@ const Dashboard = () => {
                   analytics.performanceMetrics.ongoingDeployments?.toLocaleString() ||
                   "0"
                 }
-                subtitle={`${
-                  analytics.performanceMetrics.activeOngoingDeployments || 0
-                } currently ongoing`}
+                subtitle={`${analytics.performanceMetrics.activeOngoingDeployments || 0} currently ongoing`}
                 color="amber-600"
               />
               <MetricCard
@@ -1421,9 +1570,7 @@ const Dashboard = () => {
                       analytics.subconAnalytics.trucks?.available?.toLocaleString() ||
                       "0"
                     }
-                    subtitle={`${
-                      analytics.subconAnalytics.trucks?.total || 0
-                    } total trucks`}
+                    subtitle={`${analytics.subconAnalytics.trucks?.total || 0} total trucks`}
                     color="indigo-600"
                   />
                   <MetricCard
@@ -1433,9 +1580,7 @@ const Dashboard = () => {
                       analytics.subconAnalytics.drivers?.available?.toLocaleString() ||
                       "0"
                     }
-                    subtitle={`${
-                      analytics.subconAnalytics.drivers?.total || 0
-                    } total drivers`}
+                    subtitle={`${analytics.subconAnalytics.drivers?.total || 0} total drivers`}
                     color="cyan-600"
                   />
                 </>
@@ -1456,10 +1601,7 @@ const Dashboard = () => {
                   <MetricCard
                     icon={HiOutlineScale}
                     title="Plant Weight"
-                    value={`${
-                      analytics.performanceMetrics.totalCompletedWeight?.toLocaleString() ||
-                      "0"
-                    } kg`}
+                    value={`${analytics.performanceMetrics.totalCompletedWeight?.toLocaleString() || "0"} kg`}
                     subtitle="From completed trips"
                     color="violet-600"
                   />
@@ -1467,29 +1609,20 @@ const Dashboard = () => {
               )}
             </div>
 
-            {/* Admin extra metrics — desktop (both admin & head_admin) */}
             {isAnyAdmin && (
               <div className="grid grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6 gap-2 sm:gap-3 max-xs:hidden">
                 <MetricCard
                   icon={HiOutlineTruck}
                   title="Truck Utilization"
-                  value={`${
-                    analytics.performanceMetrics.utilizationRate || 0
-                  }%`}
-                  subtitle={`${
-                    analytics.performanceMetrics.deployedTrucks || 0
-                  }/${analytics.performanceMetrics.totalTrucks || 0} deployed`}
+                  value={`${analytics.performanceMetrics.utilizationRate || 0}%`}
+                  subtitle={`${analytics.performanceMetrics.deployedTrucks || 0}/${analytics.performanceMetrics.totalTrucks || 0} deployed`}
                   color="indigo-600"
                 />
                 <MetricCard
                   icon={HiOutlineUser}
                   title="Driver Utilization"
-                  value={`${
-                    analytics.performanceMetrics.driverUtilizationRate || 0
-                  }%`}
-                  subtitle={`${
-                    analytics.performanceMetrics.deployedDrivers || 0
-                  }/${analytics.performanceMetrics.totalDrivers || 0} deployed`}
+                  value={`${analytics.performanceMetrics.driverUtilizationRate || 0}%`}
+                  subtitle={`${analytics.performanceMetrics.deployedDrivers || 0}/${analytics.performanceMetrics.totalDrivers || 0} deployed`}
                   color="cyan-600"
                 />
                 <MetricCard
@@ -1505,10 +1638,7 @@ const Dashboard = () => {
                 <MetricCard
                   icon={HiOutlineScale}
                   title="Plant Weight"
-                  value={`${
-                    analytics.performanceMetrics.totalCompletedWeight?.toLocaleString() ||
-                    "0"
-                  } kg`}
+                  value={`${analytics.performanceMetrics.totalCompletedWeight?.toLocaleString() || "0"} kg`}
                   subtitle="From completed trips"
                   color="violet-600"
                 />
@@ -1522,9 +1652,7 @@ const Dashboard = () => {
                 <MetricCard
                   icon={HiOutlineChartBar}
                   title="Cancellation Rate"
-                  value={`${
-                    analytics.performanceMetrics.cancellationRate || 0
-                  }%`}
+                  value={`${analytics.performanceMetrics.cancellationRate || 0}%`}
                   subtitle="Of all deployments"
                   color="red-600"
                 />
@@ -1540,9 +1668,7 @@ const Dashboard = () => {
                   analytics.performanceMetrics.totalDeployments?.toLocaleString() ||
                   "0"
                 }
-                subtitle={`${
-                  analytics.performanceMetrics.monthlyDeployments || 0
-                } this month`}
+                subtitle={`${analytics.performanceMetrics.monthlyDeployments || 0} this month`}
                 color="blue-600"
               />
               <MetricCardMobile
@@ -1552,9 +1678,7 @@ const Dashboard = () => {
                   analytics.performanceMetrics.completedDeployments?.toLocaleString() ||
                   "0"
                 }
-                subtitle={`${
-                  analytics.performanceMetrics.successRate || 0
-                }% rate`}
+                subtitle={`${analytics.performanceMetrics.successRate || 0}% rate`}
                 color="green-600"
               />
               <MetricCardMobile
@@ -1564,9 +1688,7 @@ const Dashboard = () => {
                   analytics.performanceMetrics.ongoingDeployments?.toLocaleString() ||
                   "0"
                 }
-                subtitle={`${
-                  analytics.performanceMetrics.activeOngoingDeployments || 0
-                } ongoing`}
+                subtitle={`${analytics.performanceMetrics.activeOngoingDeployments || 0} ongoing`}
                 color="amber-600"
               />
               <MetricCardMobile
@@ -1589,9 +1711,7 @@ const Dashboard = () => {
                       analytics.subconAnalytics.trucks?.available?.toLocaleString() ||
                       "0"
                     }
-                    subtitle={`${
-                      analytics.subconAnalytics.trucks?.total || 0
-                    } total`}
+                    subtitle={`${analytics.subconAnalytics.trucks?.total || 0} total`}
                     color="indigo-600"
                   />
                   <MetricCardMobile
@@ -1601,9 +1721,7 @@ const Dashboard = () => {
                       analytics.subconAnalytics.drivers?.available?.toLocaleString() ||
                       "0"
                     }
-                    subtitle={`${
-                      analytics.subconAnalytics.drivers?.total || 0
-                    } total`}
+                    subtitle={`${analytics.subconAnalytics.drivers?.total || 0} total`}
                     color="cyan-600"
                   />
                 </>
@@ -1624,10 +1742,7 @@ const Dashboard = () => {
                   <MetricCardMobile
                     icon={HiOutlineScale}
                     title="Plant Wt."
-                    value={`${
-                      analytics.performanceMetrics.totalCompletedWeight?.toLocaleString() ||
-                      "0"
-                    }kg`}
+                    value={`${analytics.performanceMetrics.totalCompletedWeight?.toLocaleString() || "0"}kg`}
                     subtitle="Completed trips"
                     color="violet-600"
                   />
@@ -1635,29 +1750,20 @@ const Dashboard = () => {
               )}
             </div>
 
-            {/* Admin extra metrics — mobile (both admin & head_admin) */}
             {isAnyAdmin && (
               <div className="grid grid-cols-2 gap-2 xs:hidden">
                 <MetricCardMobile
                   icon={HiOutlineTruck}
                   title="Truck Util."
-                  value={`${
-                    analytics.performanceMetrics.utilizationRate || 0
-                  }%`}
-                  subtitle={`${
-                    analytics.performanceMetrics.deployedTrucks || 0
-                  }/${analytics.performanceMetrics.totalTrucks || 0}`}
+                  value={`${analytics.performanceMetrics.utilizationRate || 0}%`}
+                  subtitle={`${analytics.performanceMetrics.deployedTrucks || 0}/${analytics.performanceMetrics.totalTrucks || 0}`}
                   color="indigo-600"
                 />
                 <MetricCardMobile
                   icon={HiOutlineUser}
                   title="Driver Util."
-                  value={`${
-                    analytics.performanceMetrics.driverUtilizationRate || 0
-                  }%`}
-                  subtitle={`${
-                    analytics.performanceMetrics.deployedDrivers || 0
-                  }/${analytics.performanceMetrics.totalDrivers || 0}`}
+                  value={`${analytics.performanceMetrics.driverUtilizationRate || 0}%`}
+                  subtitle={`${analytics.performanceMetrics.deployedDrivers || 0}/${analytics.performanceMetrics.totalDrivers || 0}`}
                   color="cyan-600"
                 />
                 <MetricCardMobile
@@ -1673,10 +1779,7 @@ const Dashboard = () => {
                 <MetricCardMobile
                   icon={HiOutlineScale}
                   title="Plant Wt."
-                  value={`${
-                    analytics.performanceMetrics.totalCompletedWeight?.toLocaleString() ||
-                    "0"
-                  }kg`}
+                  value={`${analytics.performanceMetrics.totalCompletedWeight?.toLocaleString() || "0"}kg`}
                   subtitle="Completed trips"
                   color="violet-600"
                 />
@@ -1690,9 +1793,7 @@ const Dashboard = () => {
                 <MetricCardMobile
                   icon={HiOutlineChartBar}
                   title="Cancellation"
-                  value={`${
-                    analytics.performanceMetrics.cancellationRate || 0
-                  }%`}
+                  value={`${analytics.performanceMetrics.cancellationRate || 0}%`}
                   subtitle="of all"
                   color="red-600"
                 />
@@ -1701,7 +1802,6 @@ const Dashboard = () => {
 
             {/* Trend + Status */}
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-2 sm:gap-4">
-              {/* Deployment Trends */}
               <div className={`xl:col-span-2 ${CLS.card}`}>
                 <div
                   className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${CLS.cardHeader}`}
@@ -1719,25 +1819,15 @@ const Dashboard = () => {
                   <div className="flex items-center bg-gray-100 rounded-lg p-0.5 gap-0.5 self-start sm:self-auto">
                     <button
                       onClick={() => setTrendPeriod("daily")}
-                      className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                        trendPeriod === "daily"
-                          ? "bg-white text-gray-900 shadow-sm"
-                          : "text-gray-500 hover:text-gray-700"
-                      }`}
+                      className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-all ${trendPeriod === "daily" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
                     >
-                      <TbCalendar className="text-sm" />
-                      Daily
+                      <TbCalendar className="text-sm" /> Daily
                     </button>
                     <button
                       onClick={() => setTrendPeriod("weekly")}
-                      className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                        trendPeriod === "weekly"
-                          ? "bg-white text-gray-900 shadow-sm"
-                          : "text-gray-500 hover:text-gray-700"
-                      }`}
+                      className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-all ${trendPeriod === "weekly" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
                     >
-                      <TbCalendarWeek className="text-sm" />
-                      Weekly
+                      <TbCalendarWeek className="text-sm" /> Weekly
                     </button>
                   </div>
                 </div>
@@ -1746,7 +1836,6 @@ const Dashboard = () => {
                 </ScrollableChart>
               </div>
 
-              {/* Weight Timeline Chart small screen */}
               <div className={clsx("xl:hidden", CLS.card)}>
                 <div
                   className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${CLS.cardHeader}`}
@@ -1762,25 +1851,15 @@ const Dashboard = () => {
                   <div className="flex items-center bg-gray-100 rounded-lg p-0.5 gap-0.5 self-start sm:self-auto">
                     <button
                       onClick={() => setWeightPeriod("daily")}
-                      className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                        weightPeriod === "daily"
-                          ? "bg-white text-gray-900 shadow-sm"
-                          : "text-gray-500 hover:text-gray-700"
-                      }`}
+                      className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-all ${weightPeriod === "daily" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
                     >
-                      <TbCalendar className="text-sm" />
-                      Daily
+                      <TbCalendar className="text-sm" /> Daily
                     </button>
                     <button
                       onClick={() => setWeightPeriod("weekly")}
-                      className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                        weightPeriod === "weekly"
-                          ? "bg-white text-gray-900 shadow-sm"
-                          : "text-gray-500 hover:text-gray-700"
-                      }`}
+                      className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-all ${weightPeriod === "weekly" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
                     >
-                      <TbCalendarWeek className="text-sm" />
-                      Weekly
+                      <TbCalendarWeek className="text-sm" /> Weekly
                     </button>
                   </div>
                 </div>
@@ -1792,7 +1871,6 @@ const Dashboard = () => {
                 </ScrollableChart>
               </div>
 
-              {/* Deployment Status */}
               <div className={CLS.card}>
                 <CardHeader
                   title="Deployment Status"
@@ -1807,7 +1885,6 @@ const Dashboard = () => {
               </div>
             </div>
 
-            {/* Weight Timeline Chart large screen */}
             <div className={clsx("max-xl:hidden", CLS.card)}>
               <div
                 className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${CLS.cardHeader}`}
@@ -1823,25 +1900,15 @@ const Dashboard = () => {
                 <div className="flex items-center bg-gray-100 rounded-lg p-0.5 gap-0.5 self-start sm:self-auto">
                   <button
                     onClick={() => setWeightPeriod("daily")}
-                    className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                      weightPeriod === "daily"
-                        ? "bg-white text-gray-900 shadow-sm"
-                        : "text-gray-500 hover:text-gray-700"
-                    }`}
+                    className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-all ${weightPeriod === "daily" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
                   >
-                    <TbCalendar className="text-sm" />
-                    Daily
+                    <TbCalendar className="text-sm" /> Daily
                   </button>
                   <button
                     onClick={() => setWeightPeriod("weekly")}
-                    className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                      weightPeriod === "weekly"
-                        ? "bg-white text-gray-900 shadow-sm"
-                        : "text-gray-500 hover:text-gray-700"
-                    }`}
+                    className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-all ${weightPeriod === "weekly" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
                   >
-                    <TbCalendarWeek className="text-sm" />
-                    Weekly
+                    <TbCalendarWeek className="text-sm" /> Weekly
                   </button>
                 </div>
               </div>
@@ -1853,7 +1920,6 @@ const Dashboard = () => {
               </ScrollableChart>
             </div>
 
-            {/* Fleet charts — visible to both admin & head_admin */}
             {isAnyAdmin && (
               <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-2 sm:gap-4">
                 <div className={CLS.card}>
@@ -1871,7 +1937,6 @@ const Dashboard = () => {
                     />
                   </div>
                 </div>
-
                 <div className={CLS.card}>
                   <CardHeader
                     title="Truck Status"
@@ -1884,7 +1949,6 @@ const Dashboard = () => {
                     />
                   </div>
                 </div>
-
                 <div className={CLS.card}>
                   <CardHeader
                     title="Driver Status"
@@ -1897,8 +1961,6 @@ const Dashboard = () => {
                     />
                   </div>
                 </div>
-
-                {/* Top Drivers */}
                 <div className={`col-span-full ${CLS.card}`}>
                   <CardHeader
                     title="Top Drivers Performance"
@@ -2055,71 +2117,21 @@ const Dashboard = () => {
               </div>
             </div>
 
+            {/* ── NEW: Territory Detailed Breakdown ── */}
             <div className={CLS.cardOverflow}>
-              <div className="p-3 sm:p-4 border-b border-gray-100">
-                <h2 className={CLS.cardTitle}>Territory Performance Details</h2>
-                <p className={CLS.cardSubtitle}>
-                  Performance metrics by territory
-                </p>
+              <div className="p-3 sm:p-5 border-b border-gray-100 flex items-center justify-between gap-3 flex-wrap">
+                <div>
+                  <h2 className={CLS.cardTitle}>
+                    Territory Performance Details
+                  </h2>
+                  <p className={CLS.cardSubtitle}>
+                    Per-territory breakdown with hybrid, flagging, and weight
+                    data
+                  </p>
+                </div>
               </div>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      {[
-                        "Territory",
-                        "Total Deployments",
-                        "Completed",
-                        "Completion Rate",
-                        "Total Sacks",
-                        "Total Weight (kg)",
-                      ].map((h) => (
-                        <th key={h} className={CLS.thCell}>
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {analytics?.territoryMetrics
-                      ?.slice(0, 10)
-                      .map((territory, index) => (
-                        <tr
-                          key={index}
-                          className={
-                            index % 2 === 0 ? "bg-white" : "bg-gray-50"
-                          }
-                        >
-                          <td
-                            className={`${CLS.tdCell} font-medium text-gray-900`}
-                          >
-                            {territory._id || "Unknown"}
-                          </td>
-                          <td className={`${CLS.tdCell} text-gray-500`}>
-                            {territory.count?.toLocaleString() || "0"}
-                          </td>
-                          <td className={`${CLS.tdCell} text-gray-500`}>
-                            {territory.completed || "0"}
-                          </td>
-                          <td className={CLS.tdCell}>
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-xxs font-medium ${completionBadge(
-                                territory.completionRate,
-                              )}`}
-                            >
-                              {territory.completionRate || "0"}%
-                            </span>
-                          </td>
-                          <td className={`${CLS.tdCell} text-gray-500`}>
-                            {territory.totalSacks?.toLocaleString() || "0"}
-                          </td>
-                          <td className={`${CLS.tdCell} text-gray-500`}>
-                            {territory.totalWeight?.toLocaleString() || "0"} kg
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
+              <div className="p-3 sm:p-4">
+                <TerritoryDetailedBreakdown />
               </div>
             </div>
           </div>
@@ -2130,7 +2142,6 @@ const Dashboard = () => {
         ════════════════════════════════════════════════════════════════ */}
         {activeTab === "users" && isHeadAdmin && (
           <div className={CLS.tabSection}>
-            {/* Top row metrics — desktop */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 max-xs:hidden">
               <MetricCard
                 icon={HiOutlineUsers}
@@ -2173,8 +2184,6 @@ const Dashboard = () => {
                 color="purple-600"
               />
             </div>
-
-            {/* Bottom row metrics — desktop */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2 sm:gap-3 max-xs:hidden">
               <MetricCard
                 icon={HiOutlineKey}
@@ -2207,7 +2216,6 @@ const Dashboard = () => {
               />
             </div>
 
-            {/* All metrics — mobile */}
             <div className="grid grid-cols-2 gap-2 xs:hidden">
               <MetricCardMobile
                 icon={HiOutlineUsers}
@@ -2280,7 +2288,6 @@ const Dashboard = () => {
               />
             </div>
 
-            {/* User Role + Status charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-4">
               <div className={CLS.card}>
                 <CardHeader
@@ -2307,8 +2314,6 @@ const Dashboard = () => {
                 </div>
               </div>
             </div>
-
-            {/* Subcontractor Distribution */}
             <div className={CLS.card}>
               <CardHeader
                 title="Subcontractor Distribution"
@@ -2328,11 +2333,10 @@ const Dashboard = () => {
         )}
 
         {/* ════════════════════════════════════════════════════════════════
-            SUBCONTRACTORS TAB — admin & head_admin
+            SUBCONTRACTORS TAB
         ════════════════════════════════════════════════════════════════ */}
         {activeTab === "subcons" && isAnyAdmin && (
           <div className={CLS.tabSection}>
-            {/* Subcon stacked bar */}
             <div className={CLS.card}>
               <CardHeader
                 title="Subcontractor Deployment Status"
@@ -2394,9 +2398,7 @@ const Dashboard = () => {
                           </td>
                           <td className={CLS.tdCell}>
                             <span
-                              className={`px-2 py-0.5 rounded-full text-xxs font-medium ${completionBadge(
-                                subcon.completionRate,
-                              )}`}
+                              className={`px-2 py-0.5 rounded-full text-xxs font-medium ${completionBadge(subcon.completionRate)}`}
                             >
                               {subcon.completionRate}%
                             </span>
@@ -2423,7 +2425,6 @@ const Dashboard = () => {
           isSubcon &&
           analytics?.subconAnalytics && (
             <div className={CLS.tabSection}>
-              {/* Metrics — desktop */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 max-xs:hidden">
                 <MetricCard
                   icon={HiOutlineTruck}
@@ -2432,9 +2433,7 @@ const Dashboard = () => {
                     analytics.subconAnalytics.trucks?.total?.toLocaleString() ||
                     "0"
                   }
-                  subtitle={`${
-                    analytics.subconAnalytics.trucks?.available || 0
-                  } available`}
+                  subtitle={`${analytics.subconAnalytics.trucks?.available || 0} available`}
                   color="indigo-600"
                 />
                 <MetricCard
@@ -2444,9 +2443,7 @@ const Dashboard = () => {
                     analytics.subconAnalytics.drivers?.total?.toLocaleString() ||
                     "0"
                   }
-                  subtitle={`${
-                    analytics.subconAnalytics.drivers?.available || 0
-                  } available`}
+                  subtitle={`${analytics.subconAnalytics.drivers?.available || 0} available`}
                   color="cyan-600"
                 />
                 <MetricCard
@@ -2456,9 +2453,7 @@ const Dashboard = () => {
                     analytics.subconAnalytics.trucks?.deployed?.toLocaleString() ||
                     "0"
                   }
-                  subtitle={`${
-                    analytics.performanceMetrics.deployedTrucks || 0
-                  } currently deployed`}
+                  subtitle={`${analytics.performanceMetrics.deployedTrucks || 0} currently deployed`}
                   color="blue-600"
                 />
                 <MetricCard
@@ -2468,14 +2463,10 @@ const Dashboard = () => {
                     analytics.subconAnalytics.drivers?.deployed?.toLocaleString() ||
                     "0"
                   }
-                  subtitle={`${
-                    analytics.performanceMetrics.deployedDrivers || 0
-                  } currently deployed`}
+                  subtitle={`${analytics.performanceMetrics.deployedDrivers || 0} currently deployed`}
                   color="green-600"
                 />
               </div>
-
-              {/* Metrics — mobile */}
               <div className="grid grid-cols-2 gap-2 xs:hidden">
                 <MetricCardMobile
                   icon={HiOutlineTruck}
@@ -2484,9 +2475,7 @@ const Dashboard = () => {
                     analytics.subconAnalytics.trucks?.total?.toLocaleString() ||
                     "0"
                   }
-                  subtitle={`${
-                    analytics.subconAnalytics.trucks?.available || 0
-                  } available`}
+                  subtitle={`${analytics.subconAnalytics.trucks?.available || 0} available`}
                   color="indigo-600"
                 />
                 <MetricCardMobile
@@ -2496,9 +2485,7 @@ const Dashboard = () => {
                     analytics.subconAnalytics.drivers?.total?.toLocaleString() ||
                     "0"
                   }
-                  subtitle={`${
-                    analytics.subconAnalytics.drivers?.available || 0
-                  } available`}
+                  subtitle={`${analytics.subconAnalytics.drivers?.available || 0} available`}
                   color="cyan-600"
                 />
                 <MetricCardMobile
@@ -2508,9 +2495,7 @@ const Dashboard = () => {
                     analytics.subconAnalytics.trucks?.deployed?.toLocaleString() ||
                     "0"
                   }
-                  subtitle={`${
-                    analytics.performanceMetrics.deployedTrucks || 0
-                  } deployed`}
+                  subtitle={`${analytics.performanceMetrics.deployedTrucks || 0} deployed`}
                   color="blue-600"
                 />
                 <MetricCardMobile
@@ -2520,9 +2505,7 @@ const Dashboard = () => {
                     analytics.subconAnalytics.drivers?.deployed?.toLocaleString() ||
                     "0"
                   }
-                  subtitle={`${
-                    analytics.performanceMetrics.deployedDrivers || 0
-                  } deployed`}
+                  subtitle={`${analytics.performanceMetrics.deployedDrivers || 0} deployed`}
                   color="green-600"
                 />
               </div>
@@ -2553,7 +2536,6 @@ const Dashboard = () => {
                   </div>
                 </div>
               </div>
-
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-4">
                 <div className={CLS.card}>
                   <CardHeader
@@ -2580,7 +2562,6 @@ const Dashboard = () => {
                   </div>
                 </div>
               </div>
-
               <div className={CLS.card}>
                 <CardHeader
                   title="Fleet Composition"
@@ -2594,7 +2575,6 @@ const Dashboard = () => {
                 </div>
               </div>
 
-              {/* Drivers list */}
               <div className={CLS.cardOverflow}>
                 <div className="p-3 sm:p-4 border-b border-gray-100">
                   <h2 className={CLS.cardTitle}>All Drivers</h2>
@@ -2641,9 +2621,7 @@ const Dashboard = () => {
                             </td>
                             <td className={CLS.tdCell}>
                               <span
-                                className={`px-2 py-0.5 rounded-full text-xxs font-medium ${statusBadge(
-                                  driver.status,
-                                )}`}
+                                className={`px-2 py-0.5 rounded-full text-xxs font-medium ${statusBadge(driver.status)}`}
                               >
                                 {driver.status
                                   ? driver.status.charAt(0).toUpperCase() +
@@ -2664,7 +2642,6 @@ const Dashboard = () => {
                 </div>
               </div>
 
-              {/* Trucks list */}
               <div className={CLS.cardOverflow}>
                 <div className="p-3 sm:p-4 border-b border-gray-100">
                   <h2 className={CLS.cardTitle}>All Trucks</h2>
@@ -2717,9 +2694,7 @@ const Dashboard = () => {
                             </td>
                             <td className={CLS.tdCell}>
                               <span
-                                className={`px-2 py-0.5 rounded-full text-xxs font-medium ${statusBadge(
-                                  truck.status,
-                                )}`}
+                                className={`px-2 py-0.5 rounded-full text-xxs font-medium ${statusBadge(truck.status)}`}
                               >
                                 {truck.status
                                   ? truck.status.charAt(0).toUpperCase() +

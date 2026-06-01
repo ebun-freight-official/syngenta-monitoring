@@ -143,10 +143,12 @@ const deploymentSchema = new mongoose.Schema(
     ],
 
     // ------------- truck & driver details ------------- //
+    // truckId and driverId are optional — a deployment can be created without
+    // them when no truck/driver is available, and assigned later via update.
     truckId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Truck",
-      required: [true, "Truck is required"],
+      default: null,
     },
     truckType: {
       type: String,
@@ -157,7 +159,7 @@ const deploymentSchema = new mongoose.Schema(
     driverId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Driver",
-      required: [true, "Driver is required"],
+      default: null,
     },
     helperCount: {
       type: String,
