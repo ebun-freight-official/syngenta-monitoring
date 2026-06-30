@@ -36,11 +36,20 @@ const deploymentSchema = new mongoose.Schema(
           trim: true,
           maxlength: [100, "Pick-up site cannot exceed 100 characters"],
         },
+        address: {
+          type: String,
+          trim: true,
+          maxlength: [100, "Address cannot exceed 200 characters"],
+        },
         municipality: {
           type: String,
-          required: [true, "Municipality is required"],
           trim: true,
           maxlength: [100, "Municipality cannot exceed 100 characters"],
+        },
+        province: {
+          type: String,
+          trim: true,
+          maxlength: [100, "Province cannot exceed 100 characters"],
         },
         fieldContactPerson: {
           type: String,
@@ -117,19 +126,16 @@ const deploymentSchema = new mongoose.Schema(
         },
         hybrid: {
           type: String,
-          required: [true, "Hybrid is required"],
           trim: true,
           maxlength: [100, "Hybrid cannot exceed 100 characters"],
         },
         territory: {
           type: String,
-          required: [true, "Territory is required"],
           trim: true,
           maxlength: [100, "Territory cannot exceed 100 characters"],
         },
         flagging: {
           type: String,
-          required: [true, "Flagging is required"],
           trim: true,
           maxlength: [50, "Flagging cannot exceed 50 characters"],
         },
@@ -139,6 +145,40 @@ const deploymentSchema = new mongoose.Schema(
           maxlength: [300, "Flagging remarks cannot exceed 300 characters"],
           default: "",
         },
+
+        // new added
+        productType: {
+          type: String,
+          trim: true,
+          maxlength: [100, "Product Type cannot exceed 100 characters"],
+        },
+        ports: [
+          {
+            portName: {
+              type: String,
+              trim: true,
+              maxlength: [100, "Port name cannot exceed 100 characters"],
+            },
+            portIn: {
+              type: String,
+              trim: true,
+              default: "",
+              match: [
+                /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?)?$/,
+                "Invalid port-in time format",
+              ],
+            },
+            portOut: {
+              type: String,
+              trim: true,
+              default: "",
+              match: [
+                /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?)?$/,
+                "Invalid port-out time format",
+              ],
+            },
+          },
+        ],
       },
     ],
 

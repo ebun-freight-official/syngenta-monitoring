@@ -9,10 +9,18 @@ import {
   FaSearch,
   FaArrowUp,
   FaArrowDown,
+  FaBoxOpen,
+  FaSeedling,
+  FaBox,
+  FaShoppingBag,
+  FaPallet,
+  FaArchive,
 } from "react-icons/fa";
 import { DEPLOYMENT_STATUS } from "../../utils/generalOptions";
 import { IoClose } from "react-icons/io5";
 import {
+  MdAgriculture,
+  MdGrain,
   MdOutlineKeyboardArrowLeft,
   MdOutlineKeyboardArrowRight,
 } from "react-icons/md";
@@ -41,6 +49,8 @@ import PaySlipModal from "../../components/modals/PaySlipModal";
 import PageHeader from "../../components/PageHeader";
 import FilterDropdown from "../../components/ui/FilterDropdown";
 import { COMPANY_OPTIONS } from "../../utils/userOptions";
+import { GiCorn, GiStack } from "react-icons/gi";
+import CreateFGDeployment from "../../components/modals/CreateFGDeployment";
 
 const defaultFilters = {
   status: "",
@@ -381,6 +391,8 @@ function Deployments() {
   const [isDeploymentDetailsModalOpen, setIsDeploymentDetailsModalOpen] =
     useState(false);
   const [isCreateDeploymentModalOpen, setIsCreateDeploymentModalOpen] =
+    useState(false);
+  const [isCreateFGDeploymentModalOpen, setIsCreateFGDeploymentModalOpen] =
     useState(false);
   const [isReplacementModalOpen, setIsReplacementModalOpen] = useState(false);
   const [showReplacementHistory, setShowReplacementHistory] = useState(false);
@@ -880,17 +892,60 @@ function Deployments() {
 
               {/* xl Create */}
               {["head_admin", "admin"].includes(userData.data.role) && (
-                <button
-                  onClick={() => setIsCreateDeploymentModalOpen(true)}
-                  disabled={isDeploymentLoading}
-                  className={clsx(
-                    btnBase,
-                    "bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-100 max-xl:hidden",
-                  )}
-                >
-                  <FaPlus className="text-xs" />
-                  <span>Deploy</span>
-                </button>
+                <div className="dropdown dropdown-end sm:dropdown-center max-xl:hidden">
+                  <div
+                    tabIndex={0}
+                    role="button"
+                    className={clsx(
+                      btnBase,
+                      "bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-100",
+                    )}
+                  >
+                    <FaPlus className="text-xs" />
+                    <span>Deploy</span>
+                  </div>
+                  <div
+                    tabIndex={0}
+                    className="dropdown-content mt-2 bg-white shadow-lg shadow-gray-200/60 rounded-2xl border border-gray-100 w-[calc(100vw-2rem)] max-w-xs overflow-hidden"
+                  >
+                    <div className="p-1.5 space-y-0.5">
+                      <button
+                        onClick={() => setIsCreateFGDeploymentModalOpen(true)}
+                        className="w-full text-left px-3 py-2.5 hover:bg-gray-50 rounded-md flex items-center gap-3 cursor-pointer active:scale-[0.98] transition-all group"
+                      >
+                        <div className="w-8 h-8 rounded-md bg-emerald-50 flex items-center justify-center shrink-0 group-hover:bg-emerald-100 transition-colors">
+                          <FaArchive className="text-sm text-emerald-500" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-gray-700">
+                            Finished Goods
+                          </p>
+                          <p className="text-xxs text-gray-400 mt-0.5">
+                            Processed goods transport
+                          </p>
+                        </div>
+                      </button>
+
+                      <button
+                        onClick={() => setIsCreateDeploymentModalOpen(true)}
+                        className="w-full text-left px-3 py-2.5 hover:bg-gray-50 rounded-md flex items-center gap-3 cursor-pointer active:scale-[0.98] transition-all group"
+                      >
+                        <div className="w-8 h-8 rounded-md bg-amber-50 flex items-center justify-center shrink-0 group-hover:bg-amber-100 transition-colors">
+                          <FaSeedling className="text-sm text-amber-500" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-gray-700">
+                            Normal One
+                          </p>
+                          <p className="text-xxs text-gray-400 mt-0.5">
+                            From field to plant transports
+                          </p>
+                        </div>
+                      </button>
+                    </div>
+                    <div className="pb-1.5" />
+                  </div>
+                </div>
               )}
             </div>
           </div>
@@ -1124,6 +1179,13 @@ function Deployments() {
         openReplacementHistory={() => setShowReplacementHistory(true)}
         openPaySlipModal={() => setIsPaySlipModalOpen(true)}
         updatable={["head_admin", "admin"].includes(userData.data.role)}
+      />
+      <CreateFGDeployment
+        isOpen={isCreateFGDeploymentModalOpen}
+        onClose={() => setIsCreateFGDeploymentModalOpen(false)}
+        trucks={allTrucks}
+        drivers={allDrivers}
+        onCreate={handleAddNewDeployment}
       />
       <CreateDeploymentModal
         isOpen={isCreateDeploymentModalOpen}
