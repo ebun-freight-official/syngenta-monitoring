@@ -288,6 +288,11 @@ const getAllDeployments = async (req, res, next) => {
 
     if (completedAtFrom || completedAtTo) status = 'completed'
 
+    // Finance users can only see completed deployments
+    if (req.user.role === 'finance') {
+      status = 'completed'
+    }
+
     const subconFilter =
       req.user.role === 'subcon' && req.user.subcon
         ? req.user.subcon.toLowerCase()
@@ -298,7 +303,7 @@ const getAllDeployments = async (req, res, next) => {
     let baseQuery = Deployment.find()
 
     // ── Company isolation ──
-    if (['admin', 'visitor'].includes(req.user.role)) {
+    if (['admin', 'visitor', 'finance'].includes(req.user.role)) {
       baseQuery = baseQuery.where('company').equals(req.user.company)
     }
 
@@ -419,7 +424,7 @@ const getAllDeployments = async (req, res, next) => {
       let q = Deployment.find()
 
       // ── Company isolation for count query ──
-      if (['admin', 'visitor'].includes(req.user.role)) {
+      if (['admin', 'visitor', 'finance'].includes(req.user.role)) {
         q = q.where('company').equals(req.user.company)
       }
       if (req.user.role === 'head_admin' && company && company !== '') {
@@ -551,10 +556,11 @@ const updateDeployment = async (req, res, next) => {
       status,
       cancellationReason,
       isTMOPrinted,
-      isPaySlipPrinted
+      isPaySlipPrinted,
+      isPaid // ← new field
     } = req.body
 
-    if (!['head_admin', 'admin'].includes(req.user.role)) {
+    if (!['head_admin', 'admin', 'finance'].includes(req.user.role)) {
       return next(createError(403, 'Access denied'))
     }
 
@@ -642,6 +648,7 @@ const updateDeployment = async (req, res, next) => {
       cancellationReason: existingDeployment.cancellationReason,
       isTMOPrinted: existingDeployment.isTMOPrinted,
       isPaySlipPrinted: existingDeployment.isPaySlipPrinted,
+      isPaid: existingDeployment.isPaid, // ← new
       replacementTruckId:
         lastTruckReplacement?.replacementTruckId?.toString() ?? '',
       replacementDriverId:
@@ -841,7 +848,6 @@ const updateDeployment = async (req, res, next) => {
     }
 
     // ── Regular truck/driver change (non-replacement) ─────────────────────
-    // Only log/act when both: a new value was provided AND it differs from current
     if (
       extractedTruckId != null &&
       extractedTruckId.toString() !== (originalValues.truckId ?? '') &&
@@ -912,7 +918,6 @@ const updateDeployment = async (req, res, next) => {
     }
 
     // ── Active IDs after replacement processing ───────────────────────────
-    // Re-derive from the (now possibly updated) replacements array
     const updatedLastTruckReplacement = existingDeployment.replacements
       ?.slice()
       .reverse()
@@ -956,7 +961,7 @@ const updateDeployment = async (req, res, next) => {
         currentActiveTruckId &&
         !performedReplacement &&
         (!hasExistingReplacement ||
-          currentActiveTruckId.toString() !== (originalValues.truckId ?? '')) // ✅ null-safe
+          currentActiveTruckId.toString() !== (originalValues.truckId ?? ''))
       ) {
         statusUpdates.push(
           Truck.findByIdAndUpdate(currentActiveTruckId, { status: 'deployed' })
@@ -966,7 +971,7 @@ const updateDeployment = async (req, res, next) => {
         currentActiveDriverId &&
         !performedDriverReplacement &&
         (!hasExistingDriverReplacement ||
-          currentActiveDriverId.toString() !== (originalValues.driverId ?? '')) // ✅ null-safe
+          currentActiveDriverId.toString() !== (originalValues.driverId ?? ''))
       ) {
         statusUpdates.push(
           Driver.findByIdAndUpdate(currentActiveDriverId, {
@@ -980,7 +985,7 @@ const updateDeployment = async (req, res, next) => {
     // ── Truck/driver swap (non-replacement) ───────────────────────────────
     if (
       extractedTruckId &&
-      extractedTruckId.toString() !== (originalValues.truckId ?? '') && // ✅ null-safe
+      extractedTruckId.toString() !== (originalValues.truckId ?? '') &&
       !hasExistingReplacement &&
       !performedReplacement
     ) {
@@ -1001,7 +1006,7 @@ const updateDeployment = async (req, res, next) => {
 
     if (
       extractedDriverId &&
-      extractedDriverId.toString() !== (originalValues.driverId ?? '') && // ✅ null-safe
+      extractedDriverId.toString() !== (originalValues.driverId ?? '') &&
       !hasExistingDriverReplacement &&
       !performedDriverReplacement
     ) {
@@ -1133,7 +1138,9 @@ const updateDeployment = async (req, res, next) => {
       isPaySlipPrinted:
         isPaySlipPrinted !== undefined
           ? isPaySlipPrinted
-          : existingDeployment.isPaySlipPrinted
+          : existingDeployment.isPaySlipPrinted,
+      // ← new field assignment
+      isPaid: isPaid !== undefined ? isPaid : existingDeployment.isPaid
     })
 
     await existingDeployment.save()
@@ -1480,7 +1487,6 @@ const updateDeployment = async (req, res, next) => {
       !performedReplacement
     ) {
       const newTruck = await Truck.findById(extractedTruckId)
-      // First-time assignment (deployment had no truck before)
       if (!originalValues.truckId) {
         await createActivityLog(
           `Truck assigned: ${(newTruck?.plateNo || 'Unknown').toUpperCase()}`
@@ -1498,7 +1504,6 @@ const updateDeployment = async (req, res, next) => {
       !performedDriverReplacement
     ) {
       const newDriver = await Driver.findById(extractedDriverId)
-      // First-time assignment (deployment had no driver before)
       if (!originalValues.driverId) {
         await createActivityLog(
           `Driver assigned: ${
@@ -1580,6 +1585,13 @@ const updateDeployment = async (req, res, next) => {
       )
     }
 
+    // ── isPaid activity log ──────────────────────────────────────────────
+    if (isPaid !== undefined && isPaid !== originalValues.isPaid) {
+      await createActivityLog(
+        `Payment status set to ${isPaid ? 'Paid' : 'Unpaid'}`
+      )
+    }
+
     if (pickups !== undefined) {
       const oldCount = originalValues.pickups?.length || 0
       const newCount = pickups.length
@@ -1607,6 +1619,7 @@ const updateDeployment = async (req, res, next) => {
     next(error)
   }
 }
+
 // ─── Soft delete deployment ────────────────────────────────────────────────────
 
 const softDeleteDeployment = async (req, res, next) => {

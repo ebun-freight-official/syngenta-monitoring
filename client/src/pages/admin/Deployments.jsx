@@ -14,7 +14,9 @@ import {
   FaBox,
   FaShoppingBag,
   FaPallet,
-  FaArchive
+  FaArchive,
+  FaCheck,
+  FaTimes
 } from 'react-icons/fa'
 import { DEPLOYMENT_STATUS } from '../../utils/generalOptions'
 import { IoClose } from 'react-icons/io5'
@@ -51,6 +53,8 @@ import FilterDropdown from '../../components/ui/FilterDropdown'
 import { COMPANY_OPTIONS } from '../../utils/userOptions'
 import { GiCorn, GiStack } from 'react-icons/gi'
 import CreateFGDeployment from '../../components/modals/CreateFGDeployment'
+import { RiCheckLine, RiCloseLine } from 'react-icons/ri'
+import ActionButton from '../../components/ui/ActionButton'
 
 const defaultFilters = {
   status: '',
@@ -975,14 +979,17 @@ function Deployments () {
                     <td>{total}</td>
                     <td className='max-sm:pl-2.5'>DP Code</td>
                     <td>Truck Details</td>
-                    <td>Status</td>
+                    {userData.data.role === 'finance' && <td>Payment</td>}
+                    {userData.data.role !== 'finance' && <td>Status</td>}
                     <td>Departed</td>
                     <td>Pick-up In</td>
                     <td>Pick-up Out</td>
                     <td>Dest. Arrival</td>
                     <td>Dest. Departure</td>
                     <td>Unloading</td>
-                    <td>Wt. Difference</td>
+                    {['head_admin', 'admin'].includes(userData.data.role) && (
+                      <td>Wt. Difference</td>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -1047,27 +1054,47 @@ function Deployments () {
                         <TruckDetailsCell deployment={deployment} />
                       </td>
 
+                      {/* ── Payment (finance only) ── */}
+                      {userData.data.role === 'finance' && (
+                        <td>
+                          <div
+                            className={clsx(
+                              'px-2.5 py-1 rounded-full w-fit text-xxs sm:text-xs text-nowrap',
+                              {
+                                'bg-emerald-50 text-emerald-600':
+                                  deployment.isPaid,
+                                'bg-red-50 text-red-500': !deployment.isPaid
+                              }
+                            )}
+                          >
+                            {deployment.isPaid ? 'Paid' : 'Not Paid'}
+                          </div>
+                        </td>
+                      )}
+
                       {/* ── Status + Progress Bar + Description ── */}
-                      <td>
-                        <div
-                          className={clsx(
-                            'px-2.5 py-1 rounded-full w-fit text-xxs sm:text-xs',
-                            {
-                              'bg-orange-50 text-orange-500':
-                                deployment.status === 'preparing',
-                              'bg-emerald-50 text-emerald-600':
-                                deployment.status === 'ongoing',
-                              'bg-blue-50 text-blue-500':
-                                deployment.status === 'completed',
-                              'bg-red-50 text-red-500':
-                                deployment.status === 'canceled'
-                            }
-                          )}
-                        >
-                          {deployment.status}
-                        </div>
-                        <DeploymentProgressBar deployment={deployment} />
-                      </td>
+                      {userData.data.role !== 'finance' && (
+                        <td>
+                          <div
+                            className={clsx(
+                              'px-2.5 py-1 rounded-full w-fit text-xxs sm:text-xs',
+                              {
+                                'bg-orange-50 text-orange-500':
+                                  deployment.status === 'preparing',
+                                'bg-emerald-50 text-emerald-600':
+                                  deployment.status === 'ongoing',
+                                'bg-blue-50 text-blue-500':
+                                  deployment.status === 'completed',
+                                'bg-red-50 text-red-500':
+                                  deployment.status === 'canceled'
+                              }
+                            )}
+                          >
+                            {deployment.status}
+                          </div>
+                          <DeploymentProgressBar deployment={deployment} />
+                        </td>
+                      )}
 
                       <td>
                         {deployment.departed ? (
@@ -1150,9 +1177,11 @@ function Deployments () {
                         )}
                       </td>
 
-                      <td>
-                        <WeightDiffCell deployment={deployment} />
-                      </td>
+                      {['head_admin', 'admin'].includes(userData.data.role) && (
+                        <td>
+                          <WeightDiffCell deployment={deployment} />
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
