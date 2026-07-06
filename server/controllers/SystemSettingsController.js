@@ -4,7 +4,7 @@ const ActivityLog = require('../models/activityLogsModel')
 
 const CONTACT_PERSON_FIELDS = ['fieldContactPersons', 'receivingContactPersons']
 
-function isContactPersonField(field) {
+function isContactPersonField (field) {
   return CONTACT_PERSON_FIELDS.includes(field)
 }
 
@@ -12,14 +12,21 @@ const getAllSettings = async (req, res, next) => {
   try {
     const { category } = req.query
 
-    if (!['head_admin', 'admin', 'visitor', 'subcon'].includes(req.user.role)) {
+    if (
+      !['head_admin', 'admin', 'visitor', 'subcon', 'finance'].includes(
+        req.user.role
+      )
+    ) {
       return next(createError(403, 'Access denied'))
     }
 
     const query = {}
     if (category) query.category = category
 
-    const settings = await SystemSettings.find(query).sort({ category: 1, field: 1 })
+    const settings = await SystemSettings.find(query).sort({
+      category: 1,
+      field: 1
+    })
 
     return res.status(200).json({ settings })
   } catch (error) {
@@ -45,7 +52,9 @@ const addOptionValue = async (req, res, next) => {
       const { name, contactNo } = value
 
       if (!name?.trim() || !contactNo?.trim()) {
-        return next(createError(400, 'Contact person requires both name and contactNo'))
+        return next(
+          createError(400, 'Contact person requires both name and contactNo')
+        )
       }
 
       const trimmedName = name.trim()
@@ -57,7 +66,9 @@ const addOptionValue = async (req, res, next) => {
         setting = await SystemSettings.create({
           category,
           field,
-          contactPersonValues: [{ name: trimmedName, contactNo: trimmedContactNo }]
+          contactPersonValues: [
+            { name: trimmedName, contactNo: trimmedContactNo }
+          ]
         })
 
         await ActivityLog.create({
@@ -67,7 +78,8 @@ const addOptionValue = async (req, res, next) => {
         })
 
         return res.status(201).json({
-          message: 'Setting field created and contact person added successfully',
+          message:
+            'Setting field created and contact person added successfully',
           setting
         })
       }
@@ -77,10 +89,15 @@ const addOptionValue = async (req, res, next) => {
       )
 
       if (nameExists) {
-        return res.status(400).json({ message: 'A contact person with this name already exists' })
+        return res
+          .status(400)
+          .json({ message: 'A contact person with this name already exists' })
       }
 
-      setting.contactPersonValues.push({ name: trimmedName, contactNo: trimmedContactNo })
+      setting.contactPersonValues.push({
+        name: trimmedName,
+        contactNo: trimmedContactNo
+      })
       await setting.save()
 
       await ActivityLog.create({
@@ -89,7 +106,9 @@ const addOptionValue = async (req, res, next) => {
         action: `Added contact person "${trimmedName}" to ${category} - ${field}`
       })
 
-      return res.status(200).json({ message: 'Contact person added successfully', setting })
+      return res
+        .status(200)
+        .json({ message: 'Contact person added successfully', setting })
     }
 
     const trimmedValue = typeof value === 'string' ? value.trim() : ''
@@ -136,7 +155,9 @@ const addOptionValue = async (req, res, next) => {
       action: `Added option "${trimmedValue}" to ${category} - ${field}`
     })
 
-    return res.status(200).json({ message: 'Option added successfully', setting })
+    return res
+      .status(200)
+      .json({ message: 'Option added successfully', setting })
   } catch (error) {
     next(error)
   }
@@ -165,10 +186,14 @@ const removeOptionValue = async (req, res, next) => {
     if (isContact) {
       const nameToRemove = typeof value === 'string' ? value.trim() : value
 
-      const exists = (setting.contactPersonValues || []).some(cp => cp.name === nameToRemove)
+      const exists = (setting.contactPersonValues || []).some(
+        cp => cp.name === nameToRemove
+      )
 
       if (!exists) {
-        return res.status(400).json({ message: 'Contact person does not exist' })
+        return res
+          .status(400)
+          .json({ message: 'Contact person does not exist' })
       }
 
       setting.contactPersonValues = setting.contactPersonValues.filter(
@@ -182,7 +207,9 @@ const removeOptionValue = async (req, res, next) => {
         action: `Removed contact person "${nameToRemove}" from ${category} - ${field}`
       })
 
-      return res.status(200).json({ message: 'Contact person removed successfully', setting })
+      return res
+        .status(200)
+        .json({ message: 'Contact person removed successfully', setting })
     }
 
     if (!(setting.values || []).includes(value)) {
@@ -198,7 +225,9 @@ const removeOptionValue = async (req, res, next) => {
       action: `Removed option "${value}" from ${category} - ${field}`
     })
 
-    return res.status(200).json({ message: 'Option deleted successfully', setting })
+    return res
+      .status(200)
+      .json({ message: 'Option deleted successfully', setting })
   } catch (error) {
     next(error)
   }

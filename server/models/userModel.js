@@ -1,108 +1,108 @@
-const mongoose = require("mongoose");
+const mongoose = require('mongoose')
 
 const userSchema = new mongoose.Schema(
   {
     firstname: {
       type: String,
-      required: [true, "Firstname is required"],
+      required: [true, 'Firstname is required'],
       trim: true,
-      minlength: [2, "Firstname must be at least 2 characters long"],
-      maxlength: [50, "Firstname cannot exceed 50 characters"],
-      match: [/^[a-zA-Z\s'-]+$/, "Firstname must contain letters only"],
+      minlength: [2, 'Firstname must be at least 2 characters long'],
+      maxlength: [50, 'Firstname cannot exceed 50 characters'],
+      match: [/^[a-zA-Z\s'-]+$/, 'Firstname must contain letters only']
     },
     lastname: {
       type: String,
-      required: [true, "Lastname is required"],
+      required: [true, 'Lastname is required'],
       trim: true,
-      minlength: [2, "Lastname must be at least 2 characters long"],
-      maxlength: [50, "Lastname cannot exceed 50 characters"],
-      match: [/^[a-zA-Z\s'-]+$/, "Lastname must contain letters only"],
+      minlength: [2, 'Lastname must be at least 2 characters long'],
+      maxlength: [50, 'Lastname cannot exceed 50 characters'],
+      match: [/^[a-zA-Z\s'-]+$/, 'Lastname must contain letters only']
     },
     email: {
       type: String,
-      required: [true, "Email is required"],
+      required: [true, 'Email is required'],
       trim: true,
       lowercase: true,
       unique: true,
-      maxlength: [100, "Email cannot exceed 100 characters"],
-      match: [/^\S+@\S+\.\S+$/, "Invalid email format"],
+      maxlength: [100, 'Email cannot exceed 100 characters'],
+      match: [/^\S+@\S+\.\S+$/, 'Invalid email format']
     },
     phoneNo: {
       type: String,
       trim: true,
-      match: [/^(?:\+639|09)\d{9}$/, "Invalid phone number format"],
+      match: [/^(?:\+639|09)\d{9}$/, 'Invalid phone number format']
     },
     password: {
       type: String,
-      required: [true, "Password is required"],
-      trim: true,
+      required: [true, 'Password is required'],
+      trim: true
     },
     role: {
       type: String,
-      required: [true, "Role is required"],
+      required: [true, 'Role is required'],
       trim: true,
       lowercase: true,
       enum: {
-        values: ["head_admin", "admin", "visitor", "subcon"],
-        message: "{VALUE} is not a valid role",
-      },
+        values: ['head_admin', 'admin', 'visitor', 'subcon', 'finance'],
+        message: '{VALUE} is not a valid role'
+      }
     },
     company: {
       type: String,
       trim: true,
       lowercase: true,
       default: null,
-      maxlength: [100, "Company name cannot exceed 100 characters"],
+      maxlength: [100, 'Company name cannot exceed 100 characters']
     },
     status: {
       type: String,
-      required: [true, "Status is required"],
+      required: [true, 'Status is required'],
       trim: true,
       lowercase: true,
       enum: {
-        values: ["active", "inactive", "pending", "rejected", "revoked"],
-        message: "{VALUE} is not a valid status",
+        values: ['active', 'inactive', 'pending', 'rejected', 'revoked'],
+        message: '{VALUE} is not a valid status'
       },
-      default: "pending",
+      default: 'pending'
     },
     subcon: {
       type: String,
       trim: true,
-      maxlength: [100, "Subcon name cannot exceed 100 characters"],
-      default: null,
+      maxlength: [100, 'Subcon name cannot exceed 100 characters'],
+      default: null
     },
     loginCount: {
       type: Number,
       default: 0,
-      min: [0, "Login count cannot be negative"],
+      min: [0, 'Login count cannot be negative']
     },
     lastLogin: {
       type: Date,
       validate: {
-        validator: (value) => !value || value <= new Date(),
-        message: "Last login date cannot be in the future",
-      },
+        validator: value => !value || value <= new Date(),
+        message: 'Last login date cannot be in the future'
+      }
     },
     imageUrl: {
       type: String,
       trim: true,
-      default: "",
-      maxlength: [500, "Image URL cannot exceed 500 characters"],
-      match: [/^(https?:\/\/.*)?$/, "Invalid image URL format"],
+      default: '',
+      maxlength: [500, 'Image URL cannot exceed 500 characters'],
+      match: [/^(https?:\/\/.*)?$/, 'Invalid image URL format']
     },
     imagePublicId: {
       type: String,
       trim: true,
-      default: "",
-      maxlength: [200, "Image public ID cannot exceed 200 characters"],
+      default: '',
+      maxlength: [200, 'Image public ID cannot exceed 200 characters']
     },
     isSoftDeleted: {
       type: Boolean,
-      default: false,
-    },
+      default: false
+    }
   },
-  { timestamps: true },
-);
+  { timestamps: true }
+)
 
-const User = mongoose.model("User", userSchema);
-module.exports = User;
+const User = mongoose.model('User', userSchema)
+module.exports = User
