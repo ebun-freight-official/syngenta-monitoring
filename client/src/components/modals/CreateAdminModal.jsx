@@ -14,7 +14,6 @@ import { TbUpload } from 'react-icons/tb'
 import ActionButton from '../ui/ActionButton'
 import InputField from '../ui/InputField'
 import SelectField from '../ui/SelectField'
-import { COMPANY_OPTIONS, USER_ROLE_TYPES } from '../../utils/userOptions'
 
 /* ─── Decorative dot pattern ────────────────────────────────────────────── */
 const DotPattern = () => (
@@ -46,7 +45,6 @@ function CreateAdminModal ({ isOpen, onClose, onCreate }) {
     phoneNo: '',
     role: '',
     status: 'active',
-    company: '',
     password: '',
     confirmPassword: '',
     image: {}
@@ -247,37 +245,22 @@ function CreateAdminModal ({ isOpen, onClose, onCreate }) {
                       maxLength={11}
                       required={false}
                     />
-                    <SelectField
-                      label='Company'
-                      name='company'
-                      value={formData.company}
-                      onChange={handleChange}
-                      disabled={isLoading}
-                      required
-                    >
-                      <option value='' disabled>
-                        Select company
-                      </option>
-                      {COMPANY_OPTIONS.map((item, i) => (
-                        <option key={i} value={item}>
-                          {item}
+                    <div className='col-span-2'>
+                      <SelectField
+                        label='Role'
+                        name='role'
+                        value={formData.role}
+                        onChange={handleChange}
+                        disabled={isLoading}
+                        required
+                      >
+                        <option value='' disabled>
+                          Select role
                         </option>
-                      ))}
-                    </SelectField>
-                    <SelectField
-                      label='Role'
-                      name='role'
-                      value={formData.role}
-                      onChange={handleChange}
-                      disabled={isLoading}
-                      required
-                    >
-                      <option value='' disabled>
-                        Select role
-                      </option>
-                      <option value='admin'>Admin</option>
-                      <option value='finance'>Finance</option>
-                    </SelectField>
+                        <option value='admin'>Admin</option>
+                        <option value='finance'>Finance</option>
+                      </SelectField>
+                    </div>
                     <InputField
                       label='Password'
                       type='password'

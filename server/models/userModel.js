@@ -47,13 +47,6 @@ const userSchema = new mongoose.Schema(
         message: '{VALUE} is not a valid role'
       }
     },
-    company: {
-      type: String,
-      trim: true,
-      lowercase: true,
-      default: null,
-      maxlength: [100, 'Company name cannot exceed 100 characters']
-    },
     status: {
       type: String,
       required: [true, 'Status is required'],

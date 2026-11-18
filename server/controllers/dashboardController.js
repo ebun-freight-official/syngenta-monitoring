@@ -1,63 +1,45 @@
-const Truck = require("../models/truckModel");
-const Driver = require("../models/driverModel");
-const Deployment = require("../models/deploymentModel");
-const User = require("../models/userModel");
+const Truck = require('../models/truckModel')
+const Driver = require('../models/driverModel')
+const Deployment = require('../models/deploymentModel')
+const User = require('../models/userModel')
 
 const getDashboardAnalytics = async (req, res) => {
   try {
-    const now = new Date();
-    const last30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const last12Weeks = new Date(now.getTime() - 12 * 7 * 24 * 60 * 60 * 1000);
+    const now = new Date()
+    const last30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+    const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+    const last12Weeks = new Date(now.getTime() - 12 * 7 * 24 * 60 * 60 * 1000)
 
-    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const currentYearStart = new Date(now.getFullYear(), 0, 1);
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+    const currentYearStart = new Date(now.getFullYear(), 0, 1)
 
-    const baseFilter = { isSoftDeleted: { $ne: true } };
-    const truckAndDriverFilter = { isSoftDeleted: { $ne: true } };
-
-    // ── head_admin company filter (from query param) ───────────────────────
-    const companyParam =
-      req.user.role === "head_admin" && req.query.company
-        ? req.query.company
-        : null;
+    const baseFilter = { isSoftDeleted: { $ne: true } }
+    const truckAndDriverFilter = { isSoftDeleted: { $ne: true } }
 
     // ── Subcon: filter trucks/drivers by their subcon tag ─────────────────
-    if (req.user.role === "subcon" && req.user.subcon) {
-      truckAndDriverFilter.subcon = req.user.subcon;
+    if (req.user.role === 'subcon' && req.user.subcon) {
+      truckAndDriverFilter.subcon = req.user.subcon
     }
 
-    let subconTruckIds = null;
-    if (req.user.role === "subcon" && req.user.subcon) {
+    let subconTruckIds = null
+    if (req.user.role === 'subcon' && req.user.subcon) {
       const subconTrucks = await Truck.find({ subcon: req.user.subcon })
-        .select("_id")
-        .lean();
-      subconTruckIds = subconTrucks.map((t) => t._id);
+        .select('_id')
+        .lean()
+      subconTruckIds = subconTrucks.map(t => t._id)
     }
 
     // ── Build deployment filter ───────────────────────────────────────────
-    let deploymentFilter = { ...baseFilter };
+    let deploymentFilter = { ...baseFilter }
 
-    if (req.user.role === "head_admin" && companyParam) {
-      deploymentFilter.company = companyParam;
-    } else if (
-      ["admin", "visitor"].includes(req.user.role) &&
-      req.user.company
-    ) {
-      deploymentFilter.company = req.user.company;
-    } else if (subconTruckIds) {
-      deploymentFilter.truckId = { $in: subconTruckIds };
+    if (subconTruckIds) {
+      deploymentFilter.truckId = { $in: subconTruckIds }
     }
 
     // ── Build user filter ─────────────────────────────────────────────────
     const userScopeFilter = {
-      isSoftDeleted: { $ne: true },
-      ...(companyParam
-        ? { company: companyParam }
-        : ["admin", "visitor"].includes(req.user.role) && req.user.company
-          ? { company: req.user.company }
-          : {}),
-    };
+      isSoftDeleted: { $ne: true }
+    }
 
     const promises = {
       // ── Deployment counts ─────────────────────────────────────────────
@@ -65,39 +47,39 @@ const getDashboardAnalytics = async (req, res) => {
 
       preparingDeployments: Deployment.countDocuments({
         ...deploymentFilter,
-        status: "preparing",
+        status: 'preparing'
       }),
       ongoingDeployments: Deployment.countDocuments({
         ...deploymentFilter,
-        status: "ongoing",
+        status: 'ongoing'
       }),
       completedDeployments: Deployment.countDocuments({
         ...deploymentFilter,
-        status: "completed",
+        status: 'completed'
       }),
       cancelledDeployments: Deployment.countDocuments({
         ...deploymentFilter,
-        status: "canceled",
+        status: 'canceled'
       }),
       recentDeployments: Deployment.countDocuments({
         ...deploymentFilter,
-        createdAt: { $gte: last7Days },
+        createdAt: { $gte: last7Days }
       }),
       deploymentsLast30Days: Deployment.countDocuments({
         ...deploymentFilter,
-        createdAt: { $gte: last30Days },
+        createdAt: { $gte: last30Days }
       }),
       monthlyDeployments: Deployment.countDocuments({
         ...deploymentFilter,
-        createdAt: { $gte: currentMonthStart },
+        createdAt: { $gte: currentMonthStart }
       }),
       yearlyDeployments: Deployment.countDocuments({
         ...deploymentFilter,
-        createdAt: { $gte: currentYearStart },
+        createdAt: { $gte: currentYearStart }
       }),
       recentActivity: Deployment.countDocuments({
         ...deploymentFilter,
-        createdAt: { $gte: new Date(now.getTime() - 24 * 60 * 60 * 1000) },
+        createdAt: { $gte: new Date(now.getTime() - 24 * 60 * 60 * 1000) }
       }),
 
       // ── Truck / Driver counts ─────────────────────────────────────────
@@ -105,60 +87,60 @@ const getDashboardAnalytics = async (req, res) => {
       totalDrivers: Driver.countDocuments(truckAndDriverFilter),
       availableTrucks: Truck.countDocuments({
         ...truckAndDriverFilter,
-        status: "available",
+        status: 'available'
       }),
       availableDrivers: Driver.countDocuments({
         ...truckAndDriverFilter,
-        status: "available",
+        status: 'available'
       }),
       trucksInMaintenance: Truck.countDocuments({
         ...truckAndDriverFilter,
-        status: "unavailable",
+        status: 'unavailable'
       }),
       inactiveDrivers: Driver.countDocuments({
         ...truckAndDriverFilter,
-        status: "unavailable",
+        status: 'unavailable'
       }),
       activeTrucks: Truck.countDocuments({
         ...truckAndDriverFilter,
-        status: { $in: ["available", "deployed"] },
+        status: { $in: ['available', 'deployed'] }
       }),
       deployedTrucks: Truck.countDocuments({
         ...truckAndDriverFilter,
-        status: "deployed",
+        status: 'deployed'
       }),
       deployedDrivers: Driver.countDocuments({
         ...truckAndDriverFilter,
-        status: "deployed",
+        status: 'deployed'
       }),
 
       // ── User counts ───────────────────────────────────────────────────
       totalUsers: User.countDocuments(userScopeFilter),
       activeUsers: User.countDocuments({
         ...userScopeFilter,
-        status: "active",
+        status: 'active'
       }),
       pendingUsers: User.countDocuments({
         ...userScopeFilter,
-        status: "pending",
+        status: 'pending'
       }),
       recentRegistrations: User.countDocuments({
         ...userScopeFilter,
-        createdAt: { $gte: last30Days },
+        createdAt: { $gte: last30Days }
       }),
 
       // ── Aggregations ──────────────────────────────────────────────────
       truckStatusAnalytics: Truck.aggregate([
         { $match: truckAndDriverFilter },
-        { $group: { _id: "$status", count: { $sum: 1 } } },
+        { $group: { _id: '$status', count: { $sum: 1 } } }
       ]),
       truckTypeAnalytics: Truck.aggregate([
         { $match: truckAndDriverFilter },
-        { $group: { _id: "$truckType", count: { $sum: 1 } } },
+        { $group: { _id: '$truckType', count: { $sum: 1 } } }
       ]),
       driverStatusAnalytics: Driver.aggregate([
         { $match: truckAndDriverFilter },
-        { $group: { _id: "$status", count: { $sum: 1 } } },
+        { $group: { _id: '$status', count: { $sum: 1 } } }
       ]),
       topDriversByTrips: Driver.aggregate([
         { $match: truckAndDriverFilter },
@@ -166,15 +148,15 @@ const getDashboardAnalytics = async (req, res) => {
         { $limit: 20 },
         {
           $project: {
-            name: { $concat: ["$firstname", " ", "$lastname"] },
+            name: { $concat: ['$firstname', ' ', '$lastname'] },
             tripCount: 1,
             status: 1,
             imageUrl: 1,
             phoneNo: 1,
             subcon: 1,
-            licenseNo: 1,
-          },
-        },
+            licenseNo: 1
+          }
+        }
       ]),
 
       deploymentStatusAnalytics: Deployment.aggregate([
@@ -182,11 +164,11 @@ const getDashboardAnalytics = async (req, res) => {
           $match: {
             ...deploymentFilter,
             status: {
-              $in: ["completed", "ongoing", "canceled", "preparing"],
-            },
-          },
+              $in: ['completed', 'ongoing', 'canceled', 'preparing']
+            }
+          }
         },
-        { $group: { _id: "$status", count: { $sum: 1 } } },
+        { $group: { _id: '$status', count: { $sum: 1 } } }
       ]),
 
       // Weekly trends (last 12 weeks) — grouped by departed
@@ -194,36 +176,36 @@ const getDashboardAnalytics = async (req, res) => {
         {
           $match: {
             ...deploymentFilter,
-            status: { $ne: "canceled" },
-            departed: { $ne: "", $exists: true },
-          },
+            status: { $ne: 'canceled' },
+            departed: { $ne: '', $exists: true }
+          }
         },
         {
           $addFields: {
             departedDate: {
               $dateFromString: {
-                dateString: "$departed",
+                dateString: '$departed',
                 onError: null,
-                onNull: null,
-              },
-            },
-          },
+                onNull: null
+              }
+            }
+          }
         },
         { $match: { departedDate: { $gte: last12Weeks } } },
         {
           $group: {
             _id: {
-              year: { $year: "$departedDate" },
-              month: { $month: "$departedDate" },
+              year: { $year: '$departedDate' },
+              month: { $month: '$departedDate' },
               week: {
-                $ceil: { $divide: [{ $dayOfMonth: "$departedDate" }, 7] },
+                $ceil: { $divide: [{ $dayOfMonth: '$departedDate' }, 7] }
               },
-              status: "$status",
+              status: '$status'
             },
-            count: { $sum: 1 },
-          },
+            count: { $sum: 1 }
+          }
         },
-        { $sort: { "_id.year": 1, "_id.month": 1, "_id.week": 1 } },
+        { $sort: { '_id.year': 1, '_id.month': 1, '_id.week': 1 } }
       ]),
 
       // Daily trends (last 30 days) — grouped by departed
@@ -231,80 +213,80 @@ const getDashboardAnalytics = async (req, res) => {
         {
           $match: {
             ...deploymentFilter,
-            status: { $ne: "canceled" },
-            departed: { $ne: "", $exists: true },
-          },
+            status: { $ne: 'canceled' },
+            departed: { $ne: '', $exists: true }
+          }
         },
         {
           $addFields: {
             departedDate: {
               $dateFromString: {
-                dateString: "$departed",
+                dateString: '$departed',
                 onError: null,
-                onNull: null,
-              },
-            },
-          },
+                onNull: null
+              }
+            }
+          }
         },
         { $match: { departedDate: { $gte: last30Days } } },
         {
           $group: {
             _id: {
-              year: { $year: "$departedDate" },
-              month: { $month: "$departedDate" },
-              day: { $dayOfMonth: "$departedDate" },
-              status: "$status",
+              year: { $year: '$departedDate' },
+              month: { $month: '$departedDate' },
+              day: { $dayOfMonth: '$departedDate' },
+              status: '$status'
             },
-            count: { $sum: 1 },
-          },
+            count: { $sum: 1 }
+          }
         },
-        { $sort: { "_id.year": 1, "_id.month": 1, "_id.day": 1 } },
+        { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1 } }
       ]),
 
       weeklySacksAnalytics: Deployment.aggregate([
         {
           $match: {
             ...deploymentFilter,
-            status: { $ne: "canceled" },
-            createdAt: { $gte: last12Weeks },
-          },
+            status: { $ne: 'canceled' },
+            createdAt: { $gte: last12Weeks }
+          }
         },
         {
           $group: {
             _id: {
-              year: { $year: "$createdAt" },
-              month: { $month: "$createdAt" },
-              week: { $ceil: { $divide: [{ $dayOfMonth: "$createdAt" }, 7] } },
+              year: { $year: '$createdAt' },
+              month: { $month: '$createdAt' },
+              week: { $ceil: { $divide: [{ $dayOfMonth: '$createdAt' }, 7] } }
             },
-            totalSacks: { $sum: "$totalSacksCount" },
+            totalSacks: { $sum: '$totalSacksCount' },
             deploymentCount: { $sum: 1 },
-            avgSacksPerDeployment: { $avg: "$totalSacksCount" },
-          },
+            avgSacksPerDeployment: { $avg: '$totalSacksCount' }
+          }
         },
-        { $sort: { "_id.year": 1, "_id.month": 1, "_id.week": 1 } },
+        { $sort: { '_id.year': 1, '_id.month': 1, '_id.week': 1 } }
       ]),
 
       weeklyWeightAnalytics: Deployment.aggregate([
         {
           $match: {
             ...deploymentFilter,
-            status: { $ne: "canceled" },
-            createdAt: { $gte: last12Weeks },
-          },
+            status: { $ne: 'canceled' },
+            createdAt: { $gte: last12Weeks }
+          }
         },
         {
           $group: {
             _id: {
-              year: { $year: "$createdAt" },
-              month: { $month: "$createdAt" },
-              week: { $ceil: { $divide: [{ $dayOfMonth: "$createdAt" }, 7] } },
+              year: { $year: '$createdAt' },
+              month: { $month: '$createdAt' },
+              week: { $ceil: { $divide: [{ $dayOfMonth: '$createdAt' }, 7] } }
             },
-            totalWeight: { $sum: "$totalWeightKg" },
+            totalWeight: { $sum: '$totalWeightKg' },
             deploymentCount: { $sum: 1 },
-            avgWeightPerDeployment: { $avg: "$totalWeightKg" },
-          },
+            avgWeightPerDeployment: { $avg: '$totalWeightKg' }
+          }
         },
-        { $sort: { "_id.year": 1, "_id.month": 1, "_id.week": 1 } },
+        { $sort: { '_id.year': 1, '_id.month': 1, '_id.week': 1 } }
       ]),
 
       // Weight breakdown (est / field / plant) per week
@@ -312,65 +294,65 @@ const getDashboardAnalytics = async (req, res) => {
         {
           $match: {
             ...deploymentFilter,
-            status: "completed",
-            departed: { $ne: "", $exists: true },
-          },
+            status: 'completed',
+            departed: { $ne: '', $exists: true }
+          }
         },
         {
           $addFields: {
             departedDate: {
               $dateFromString: {
-                dateString: "$departed",
+                dateString: '$departed',
                 onError: null,
-                onNull: null,
-              },
-            },
-          },
+                onNull: null
+              }
+            }
+          }
         },
         { $match: { departedDate: { $gte: last12Weeks } } },
-        { $unwind: "$pickups" },
+        { $unwind: '$pickups' },
         {
           $group: {
             _id: {
-              year: { $year: "$departedDate" },
-              month: { $month: "$departedDate" },
+              year: { $year: '$departedDate' },
+              month: { $month: '$departedDate' },
               week: {
-                $ceil: { $divide: [{ $dayOfMonth: "$departedDate" }, 7] },
-              },
+                $ceil: { $divide: [{ $dayOfMonth: '$departedDate' }, 7] }
+              }
             },
             totalEstWeight: {
               $sum: {
                 $convert: {
-                  input: "$pickups.estimatedWeightKg",
-                  to: "double",
+                  input: '$pickups.estimatedWeightKg',
+                  to: 'double',
                   onError: 0,
-                  onNull: 0,
-                },
-              },
+                  onNull: 0
+                }
+              }
             },
             totalFieldWeight: {
               $sum: {
                 $convert: {
-                  input: "$pickups.fieldWeightKg",
-                  to: "double",
+                  input: '$pickups.fieldWeightKg',
+                  to: 'double',
                   onError: 0,
-                  onNull: 0,
-                },
-              },
+                  onNull: 0
+                }
+              }
             },
             totalPlantWeight: {
               $sum: {
                 $convert: {
-                  input: "$pickups.plantWeightKg",
-                  to: "double",
+                  input: '$pickups.plantWeightKg',
+                  to: 'double',
                   onError: 0,
-                  onNull: 0,
-                },
-              },
-            },
-          },
+                  onNull: 0
+                }
+              }
+            }
+          }
         },
-        { $sort: { "_id.year": 1, "_id.month": 1, "_id.week": 1 } },
+        { $sort: { '_id.year': 1, '_id.month': 1, '_id.week': 1 } }
       ]),
 
       // Weight breakdown (est / field / plant) per day
@@ -378,161 +360,161 @@ const getDashboardAnalytics = async (req, res) => {
         {
           $match: {
             ...deploymentFilter,
-            status: "completed",
-            departed: { $ne: "", $exists: true },
-          },
+            status: 'completed',
+            departed: { $ne: '', $exists: true }
+          }
         },
         {
           $addFields: {
             departedDate: {
               $dateFromString: {
-                dateString: "$departed",
+                dateString: '$departed',
                 onError: null,
-                onNull: null,
-              },
-            },
-          },
+                onNull: null
+              }
+            }
+          }
         },
         { $match: { departedDate: { $gte: last30Days } } },
-        { $unwind: "$pickups" },
+        { $unwind: '$pickups' },
         {
           $group: {
             _id: {
-              year: { $year: "$departedDate" },
-              month: { $month: "$departedDate" },
-              day: { $dayOfMonth: "$departedDate" },
+              year: { $year: '$departedDate' },
+              month: { $month: '$departedDate' },
+              day: { $dayOfMonth: '$departedDate' }
             },
             totalEstWeight: {
               $sum: {
                 $convert: {
-                  input: "$pickups.estimatedWeightKg",
-                  to: "double",
+                  input: '$pickups.estimatedWeightKg',
+                  to: 'double',
                   onError: 0,
-                  onNull: 0,
-                },
-              },
+                  onNull: 0
+                }
+              }
             },
             totalFieldWeight: {
               $sum: {
                 $convert: {
-                  input: "$pickups.fieldWeightKg",
-                  to: "double",
+                  input: '$pickups.fieldWeightKg',
+                  to: 'double',
                   onError: 0,
-                  onNull: 0,
-                },
-              },
+                  onNull: 0
+                }
+              }
             },
             totalPlantWeight: {
               $sum: {
                 $convert: {
-                  input: "$pickups.plantWeightKg",
-                  to: "double",
+                  input: '$pickups.plantWeightKg',
+                  to: 'double',
                   onError: 0,
-                  onNull: 0,
-                },
-              },
-            },
-          },
+                  onNull: 0
+                }
+              }
+            }
+          }
         },
-        { $sort: { "_id.year": 1, "_id.month": 1, "_id.day": 1 } },
+        { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1 } }
       ]),
 
       topPickupSites: Deployment.aggregate([
         { $match: deploymentFilter },
-        { $unwind: "$pickups" },
-        { $match: { "pickups.pickupSite": { $exists: true, $ne: "" } } },
+        { $unwind: '$pickups' },
+        { $match: { 'pickups.pickupSite': { $exists: true, $ne: '' } } },
         {
           $group: {
-            _id: "$pickups.pickupSite",
+            _id: '$pickups.pickupSite',
             count: { $sum: 1 },
-            totalSacks: { $sum: "$pickups.sacksCount" },
+            totalSacks: { $sum: '$pickups.sacksCount' },
             totalWeight: {
               $sum: {
                 $ifNull: [
                   {
                     $convert: {
-                      input: "$pickups.plantWeightKg",
-                      to: "double",
+                      input: '$pickups.plantWeightKg',
+                      to: 'double',
                       onError: null,
-                      onNull: null,
-                    },
+                      onNull: null
+                    }
                   },
                   {
                     $convert: {
-                      input: "$pickups.actualWeightKg",
-                      to: "double",
+                      input: '$pickups.actualWeightKg',
+                      to: 'double',
                       onError: 0,
-                      onNull: 0,
-                    },
-                  },
-                ],
-              },
-            },
-          },
+                      onNull: 0
+                    }
+                  }
+                ]
+              }
+            }
+          }
         },
         { $sort: { count: -1 } },
-        { $limit: 10 },
+        { $limit: 10 }
       ]),
 
       deploymentEfficiency: Deployment.aggregate([
-        { $match: { ...deploymentFilter, status: { $ne: "canceled" } } },
+        { $match: { ...deploymentFilter, status: { $ne: 'canceled' } } },
         {
           $group: {
             _id: null,
-            avgSacks: { $avg: "$totalSacksCount" },
-            avgWeight: { $avg: "$totalWeightKg" },
-            maxSacks: { $max: "$totalSacksCount" },
-            maxWeight: { $max: "$totalWeightKg" },
-          },
-        },
+            avgSacks: { $avg: '$totalSacksCount' },
+            avgWeight: { $avg: '$totalWeightKg' },
+            maxSacks: { $max: '$totalSacksCount' },
+            maxWeight: { $max: '$totalWeightKg' }
+          }
+        }
       ]),
 
       completedCargoMetrics: Deployment.aggregate([
-        { $match: { ...deploymentFilter, status: "completed" } },
+        { $match: { ...deploymentFilter, status: 'completed' } },
         {
           $group: {
             _id: null,
-            totalCompletedSacks: { $sum: "$totalSacksCount" },
-            totalCompletedWeight: { $sum: "$totalWeightKg" },
-            avgCompletedSacks: { $avg: "$totalSacksCount" },
-            avgCompletedWeight: { $avg: "$totalWeightKg" },
-            maxCompletedSacks: { $max: "$totalSacksCount" },
-            maxCompletedWeight: { $max: "$totalWeightKg" },
-          },
-        },
+            totalCompletedSacks: { $sum: '$totalSacksCount' },
+            totalCompletedWeight: { $sum: '$totalWeightKg' },
+            avgCompletedSacks: { $avg: '$totalSacksCount' },
+            avgCompletedWeight: { $avg: '$totalWeightKg' },
+            maxCompletedSacks: { $max: '$totalSacksCount' },
+            maxCompletedWeight: { $max: '$totalWeightKg' }
+          }
+        }
       ]),
 
       totalSacksAggregate: Deployment.aggregate([
-        { $match: { ...deploymentFilter, status: { $ne: "canceled" } } },
+        { $match: { ...deploymentFilter, status: { $ne: 'canceled' } } },
         {
           $group: {
             _id: null,
-            totalSacks: { $sum: "$totalSacksCount" },
-            totalWeight: { $sum: "$totalWeightKg" },
-          },
-        },
+            totalSacks: { $sum: '$totalSacksCount' },
+            totalWeight: { $sum: '$totalWeightKg' }
+          }
+        }
       ]),
 
       // ── User aggregations ─────────────────────────────────────────────
       userRoleAnalytics: User.aggregate([
         { $match: userScopeFilter },
-        { $group: { _id: "$role", count: { $sum: 1 } } },
+        { $group: { _id: '$role', count: { $sum: 1 } } }
       ]),
       userStatusAnalytics: User.aggregate([
         { $match: userScopeFilter },
-        { $group: { _id: "$status", count: { $sum: 1 } } },
+        { $group: { _id: '$status', count: { $sum: 1 } } }
       ]),
 
       subconAnalytics: Truck.aggregate([
         {
           $match: {
             ...truckAndDriverFilter,
-            subcon: { $exists: true, $ne: null, $ne: "" },
-          },
+            subcon: { $exists: true, $ne: null, $ne: '' }
+          }
         },
-        { $group: { _id: "$subcon", count: { $sum: 1 } } },
+        { $group: { _id: '$subcon', count: { $sum: 1 } } },
         { $sort: { count: -1 } },
-        { $limit: 10 },
+        { $limit: 10 }
       ]),
 
       userLoginAnalytics: User.aggregate([
@@ -540,31 +522,31 @@ const getDashboardAnalytics = async (req, res) => {
         {
           $group: {
             _id: null,
-            totalLogins: { $sum: "$loginCount" },
-            avgLoginCount: { $avg: "$loginCount" },
-            maxLoginCount: { $max: "$loginCount" },
-          },
-        },
+            totalLogins: { $sum: '$loginCount' },
+            avgLoginCount: { $avg: '$loginCount' },
+            maxLoginCount: { $max: '$loginCount' }
+          }
+        }
       ]),
 
       subconPerformance: Deployment.aggregate([
         { $match: deploymentFilter },
         {
           $lookup: {
-            from: "trucks",
-            localField: "truckId",
-            foreignField: "_id",
-            as: "truck",
-          },
+            from: 'trucks',
+            localField: 'truckId',
+            foreignField: '_id',
+            as: 'truck'
+          }
         },
-        { $unwind: "$truck" },
+        { $unwind: '$truck' },
         {
           $lookup: {
-            from: "trucks",
-            localField: "replacement.replacementTruckId",
-            foreignField: "_id",
-            as: "replacementTruck",
-          },
+            from: 'trucks',
+            localField: 'replacement.replacementTruckId',
+            foreignField: '_id',
+            as: 'replacementTruck'
+          }
         },
         {
           $addFields: {
@@ -572,30 +554,30 @@ const getDashboardAnalytics = async (req, res) => {
               $cond: [
                 {
                   $and: [
-                    { $gt: [{ $size: "$replacementTruck" }, 0] },
+                    { $gt: [{ $size: '$replacementTruck' }, 0] },
                     {
                       $ne: [
-                        { $arrayElemAt: ["$replacementTruck.subcon", 0] },
-                        null,
-                      ],
-                    },
-                  ],
+                        { $arrayElemAt: ['$replacementTruck.subcon', 0] },
+                        null
+                      ]
+                    }
+                  ]
                 },
-                { $arrayElemAt: ["$replacementTruck.subcon", 0] },
-                "$truck.subcon",
-              ],
-            },
-          },
+                { $arrayElemAt: ['$replacementTruck.subcon', 0] },
+                '$truck.subcon'
+              ]
+            }
+          }
         },
         {
           $group: {
-            _id: { subcon: "$activeSubcon", status: "$status" },
+            _id: { subcon: '$activeSubcon', status: '$status' },
             count: { $sum: 1 },
-            totalSacks: { $sum: "$totalSacksCount" },
-            totalWeight: { $sum: "$totalWeightKg" },
-          },
+            totalSacks: { $sum: '$totalSacksCount' },
+            totalWeight: { $sum: '$totalWeightKg' }
+          }
         },
-        { $sort: { "_id.subcon": 1 } },
+        { $sort: { '_id.subcon': 1 } }
       ]),
 
       subconDriverPerformance: Driver.aggregate([
@@ -603,14 +585,14 @@ const getDashboardAnalytics = async (req, res) => {
         { $sort: { tripCount: -1 } },
         {
           $project: {
-            name: { $concat: ["$firstname", " ", "$lastname"] },
+            name: { $concat: ['$firstname', ' ', '$lastname'] },
             tripCount: 1,
             status: 1,
             phoneNo: 1,
             licenseNo: 1,
-            subcon: 1,
-          },
-        },
+            subcon: 1
+          }
+        }
       ]),
 
       subconTruckPerformance: Truck.aggregate([
@@ -623,105 +605,105 @@ const getDashboardAnalytics = async (req, res) => {
             tripCount: 1,
             status: 1,
             maxLoad: 1,
-            subcon: 1,
-          },
-        },
+            subcon: 1
+          }
+        }
       ]),
 
       subconDriverStatusAnalytics: Driver.aggregate([
         { $match: truckAndDriverFilter },
-        { $group: { _id: "$status", count: { $sum: 1 } } },
+        { $group: { _id: '$status', count: { $sum: 1 } } }
       ]),
       subconTruckStatusAnalytics: Truck.aggregate([
         { $match: truckAndDriverFilter },
-        { $group: { _id: "$status", count: { $sum: 1 } } },
+        { $group: { _id: '$status', count: { $sum: 1 } } }
       ]),
       subconTruckTypeAnalytics: Truck.aggregate([
         { $match: truckAndDriverFilter },
-        { $group: { _id: "$truckType", count: { $sum: 1 } } },
+        { $group: { _id: '$truckType', count: { $sum: 1 } } }
       ]),
 
       territoryAnalytics: Deployment.aggregate([
         { $match: deploymentFilter },
-        { $unwind: "$pickups" },
-        { $match: { "pickups.territory": { $exists: true, $ne: "" } } },
-        { $group: { _id: "$pickups.territory", count: { $sum: 1 } } },
-        { $sort: { count: -1 } },
+        { $unwind: '$pickups' },
+        { $match: { 'pickups.territory': { $exists: true, $ne: '' } } },
+        { $group: { _id: '$pickups.territory', count: { $sum: 1 } } },
+        { $sort: { count: -1 } }
       ]),
       hybridAnalytics: Deployment.aggregate([
         { $match: deploymentFilter },
-        { $unwind: "$pickups" },
-        { $match: { "pickups.hybrid": { $exists: true, $ne: "" } } },
-        { $group: { _id: "$pickups.hybrid", count: { $sum: 1 } } },
-        { $sort: { count: -1 } },
+        { $unwind: '$pickups' },
+        { $match: { 'pickups.hybrid': { $exists: true, $ne: '' } } },
+        { $group: { _id: '$pickups.hybrid', count: { $sum: 1 } } },
+        { $sort: { count: -1 } }
       ]),
       flaggingAnalytics: Deployment.aggregate([
         { $match: deploymentFilter },
-        { $unwind: "$pickups" },
-        { $match: { "pickups.flagging": { $exists: true, $ne: "" } } },
-        { $group: { _id: "$pickups.flagging", count: { $sum: 1 } } },
-        { $sort: { count: -1 } },
+        { $unwind: '$pickups' },
+        { $match: { 'pickups.flagging': { $exists: true, $ne: '' } } },
+        { $group: { _id: '$pickups.flagging', count: { $sum: 1 } } },
+        { $sort: { count: -1 } }
       ]),
 
       territoryPerformance: Deployment.aggregate([
         { $match: deploymentFilter },
-        { $unwind: "$pickups" },
-        { $match: { "pickups.territory": { $exists: true, $ne: "" } } },
+        { $unwind: '$pickups' },
+        { $match: { 'pickups.territory': { $exists: true, $ne: '' } } },
         {
           $group: {
-            _id: "$pickups.territory",
+            _id: '$pickups.territory',
             count: { $sum: 1 },
-            totalSacks: { $sum: "$pickups.sacksCount" },
+            totalSacks: { $sum: '$pickups.sacksCount' },
             totalWeight: {
               $sum: {
                 $convert: {
-                  input: "$pickups.plantWeightKg",
-                  to: "double",
+                  input: '$pickups.plantWeightKg',
+                  to: 'double',
                   onError: 0,
-                  onNull: 0,
-                },
-              },
+                  onNull: 0
+                }
+              }
             },
-            avgSacks: { $avg: "$pickups.sacksCount" },
+            avgSacks: { $avg: '$pickups.sacksCount' },
             avgWeight: {
               $avg: {
                 $convert: {
-                  input: "$pickups.plantWeightKg",
-                  to: "double",
+                  input: '$pickups.plantWeightKg',
+                  to: 'double',
                   onError: 0,
-                  onNull: 0,
-                },
-              },
+                  onNull: 0
+                }
+              }
             },
             completed: {
-              $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] },
+              $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] }
             },
             completedSacks: {
               $sum: {
                 $cond: [
-                  { $eq: ["$status", "completed"] },
-                  "$pickups.sacksCount",
-                  0,
-                ],
-              },
+                  { $eq: ['$status', 'completed'] },
+                  '$pickups.sacksCount',
+                  0
+                ]
+              }
             },
             completedWeight: {
               $sum: {
                 $cond: [
-                  { $eq: ["$status", "completed"] },
+                  { $eq: ['$status', 'completed'] },
                   {
                     $convert: {
-                      input: "$pickups.plantWeightKg",
-                      to: "double",
+                      input: '$pickups.plantWeightKg',
+                      to: 'double',
                       onError: 0,
-                      onNull: 0,
-                    },
+                      onNull: 0
+                    }
                   },
-                  0,
-                ],
-              },
-            },
-          },
+                  0
+                ]
+              }
+            }
+          }
         },
         {
           $project: {
@@ -736,313 +718,313 @@ const getDashboardAnalytics = async (req, res) => {
             completedWeight: 1,
             completionRate: {
               $cond: [
-                { $eq: ["$count", 0] },
+                { $eq: ['$count', 0] },
                 0,
-                { $multiply: [{ $divide: ["$completed", "$count"] }, 100] },
-              ],
-            },
-          },
+                { $multiply: [{ $divide: ['$completed', '$count'] }, 100] }
+              ]
+            }
+          }
         },
         { $sort: { count: -1 } },
-        { $limit: 15 },
+        { $limit: 15 }
       ]),
 
       hybridPerformance: Deployment.aggregate([
-        { $match: { ...deploymentFilter, status: { $ne: "canceled" } } },
-        { $unwind: "$pickups" },
-        { $match: { "pickups.hybrid": { $exists: true, $ne: "" } } },
+        { $match: { ...deploymentFilter, status: { $ne: 'canceled' } } },
+        { $unwind: '$pickups' },
+        { $match: { 'pickups.hybrid': { $exists: true, $ne: '' } } },
         {
           $group: {
-            _id: "$pickups.hybrid",
+            _id: '$pickups.hybrid',
             count: { $sum: 1 },
-            totalSacks: { $sum: "$pickups.sacksCount" },
+            totalSacks: { $sum: '$pickups.sacksCount' },
             totalWeight: {
               $sum: {
                 $convert: {
-                  input: "$pickups.plantWeightKg",
-                  to: "double",
+                  input: '$pickups.plantWeightKg',
+                  to: 'double',
                   onError: 0,
-                  onNull: 0,
-                },
-              },
+                  onNull: 0
+                }
+              }
             },
-            avgSacks: { $avg: "$pickups.sacksCount" },
+            avgSacks: { $avg: '$pickups.sacksCount' },
             avgWeight: {
               $avg: {
                 $convert: {
-                  input: "$pickups.plantWeightKg",
-                  to: "double",
+                  input: '$pickups.plantWeightKg',
+                  to: 'double',
                   onError: 0,
-                  onNull: 0,
-                },
-              },
-            },
-          },
+                  onNull: 0
+                }
+              }
+            }
+          }
         },
-        { $sort: { count: -1 } },
+        { $sort: { count: -1 } }
       ]),
 
       flaggingPerformance: Deployment.aggregate([
-        { $match: { ...deploymentFilter, status: { $ne: "canceled" } } },
-        { $unwind: "$pickups" },
-        { $match: { "pickups.flagging": { $exists: true, $ne: "" } } },
+        { $match: { ...deploymentFilter, status: { $ne: 'canceled' } } },
+        { $unwind: '$pickups' },
+        { $match: { 'pickups.flagging': { $exists: true, $ne: '' } } },
         {
           $group: {
-            _id: "$pickups.flagging",
+            _id: '$pickups.flagging',
             count: { $sum: 1 },
-            totalSacks: { $sum: "$pickups.sacksCount" },
+            totalSacks: { $sum: '$pickups.sacksCount' },
             totalWeight: {
               $sum: {
                 $convert: {
-                  input: "$pickups.plantWeightKg",
-                  to: "double",
+                  input: '$pickups.plantWeightKg',
+                  to: 'double',
                   onError: 0,
-                  onNull: 0,
-                },
-              },
+                  onNull: 0
+                }
+              }
             },
-            avgSacks: { $avg: "$pickups.sacksCount" },
+            avgSacks: { $avg: '$pickups.sacksCount' },
             avgWeight: {
               $avg: {
                 $convert: {
-                  input: "$pickups.plantWeightKg",
-                  to: "double",
+                  input: '$pickups.plantWeightKg',
+                  to: 'double',
                   onError: 0,
-                  onNull: 0,
-                },
-              },
-            },
-          },
+                  onNull: 0
+                }
+              }
+            }
+          }
         },
-        { $sort: { count: -1 } },
+        { $sort: { count: -1 } }
       ]),
 
       territoryStatusAnalytics: Deployment.aggregate([
         { $match: deploymentFilter },
-        { $unwind: "$pickups" },
-        { $match: { "pickups.territory": { $exists: true, $ne: "" } } },
+        { $unwind: '$pickups' },
+        { $match: { 'pickups.territory': { $exists: true, $ne: '' } } },
         {
           $group: {
-            _id: { territory: "$pickups.territory", status: "$status" },
+            _id: { territory: '$pickups.territory', status: '$status' },
             count: { $sum: 1 },
-            totalSacks: { $sum: "$pickups.sacksCount" },
+            totalSacks: { $sum: '$pickups.sacksCount' },
             totalWeight: {
               $sum: {
                 $convert: {
-                  input: "$pickups.plantWeightKg",
-                  to: "double",
+                  input: '$pickups.plantWeightKg',
+                  to: 'double',
                   onError: 0,
-                  onNull: 0,
-                },
-              },
-            },
-          },
+                  onNull: 0
+                }
+              }
+            }
+          }
         },
-        { $sort: { "_id.territory": 1 } },
+        { $sort: { '_id.territory': 1 } }
       ]),
       hybridStatusAnalytics: Deployment.aggregate([
         { $match: deploymentFilter },
-        { $unwind: "$pickups" },
-        { $match: { "pickups.hybrid": { $exists: true, $ne: "" } } },
+        { $unwind: '$pickups' },
+        { $match: { 'pickups.hybrid': { $exists: true, $ne: '' } } },
         {
           $group: {
-            _id: { hybrid: "$pickups.hybrid", status: "$status" },
+            _id: { hybrid: '$pickups.hybrid', status: '$status' },
             count: { $sum: 1 },
-            totalSacks: { $sum: "$pickups.sacksCount" },
+            totalSacks: { $sum: '$pickups.sacksCount' },
             totalWeight: {
               $sum: {
                 $convert: {
-                  input: "$pickups.plantWeightKg",
-                  to: "double",
+                  input: '$pickups.plantWeightKg',
+                  to: 'double',
                   onError: 0,
-                  onNull: 0,
-                },
-              },
-            },
-          },
+                  onNull: 0
+                }
+              }
+            }
+          }
         },
-        { $sort: { "_id.hybrid": 1 } },
+        { $sort: { '_id.hybrid': 1 } }
       ]),
       flaggingStatusAnalytics: Deployment.aggregate([
         { $match: deploymentFilter },
-        { $unwind: "$pickups" },
-        { $match: { "pickups.flagging": { $exists: true, $ne: "" } } },
+        { $unwind: '$pickups' },
+        { $match: { 'pickups.flagging': { $exists: true, $ne: '' } } },
         {
           $group: {
-            _id: { flagging: "$pickups.flagging", status: "$status" },
+            _id: { flagging: '$pickups.flagging', status: '$status' },
             count: { $sum: 1 },
-            totalSacks: { $sum: "$pickups.sacksCount" },
+            totalSacks: { $sum: '$pickups.sacksCount' },
             totalWeight: {
               $sum: {
                 $convert: {
-                  input: "$pickups.plantWeightKg",
-                  to: "double",
+                  input: '$pickups.plantWeightKg',
+                  to: 'double',
                   onError: 0,
-                  onNull: 0,
-                },
-              },
-            },
-          },
+                  onNull: 0
+                }
+              }
+            }
+          }
         },
-        { $sort: { "_id.flagging": 1 } },
+        { $sort: { '_id.flagging': 1 } }
       ]),
 
       monthlyTerritoryAnalytics: Deployment.aggregate([
         {
           $match: {
             ...deploymentFilter,
-            status: { $ne: "canceled" },
+            status: { $ne: 'canceled' },
             createdAt: {
-              $gte: new Date(now.getFullYear() - 1, now.getMonth(), 1),
-            },
-          },
+              $gte: new Date(now.getFullYear() - 1, now.getMonth(), 1)
+            }
+          }
         },
         {
           $group: {
             _id: {
-              year: { $year: "$createdAt" },
-              month: { $month: "$createdAt" },
-              territory: "$territory",
+              year: { $year: '$createdAt' },
+              month: { $month: '$createdAt' },
+              territory: '$territory'
             },
             count: { $sum: 1 },
-            totalSacks: { $sum: "$totalSacksCount" },
-            totalWeight: { $sum: "$totalWeightKg" },
-          },
+            totalSacks: { $sum: '$totalSacksCount' },
+            totalWeight: { $sum: '$totalWeightKg' }
+          }
         },
-        { $sort: { "_id.year": 1, "_id.month": 1, "_id.territory": 1 } },
+        { $sort: { '_id.year': 1, '_id.month': 1, '_id.territory': 1 } }
       ]),
 
       weeklyTerritoryAnalytics: Deployment.aggregate([
         {
           $match: {
             ...deploymentFilter,
-            status: { $ne: "canceled" },
-            createdAt: { $gte: last12Weeks },
-          },
+            status: { $ne: 'canceled' },
+            createdAt: { $gte: last12Weeks }
+          }
         },
         {
           $group: {
             _id: {
-              year: { $year: "$createdAt" },
-              month: { $month: "$createdAt" },
-              week: { $ceil: { $divide: [{ $dayOfMonth: "$createdAt" }, 7] } },
-              territory: "$territory",
+              year: { $year: '$createdAt' },
+              month: { $month: '$createdAt' },
+              week: { $ceil: { $divide: [{ $dayOfMonth: '$createdAt' }, 7] } },
+              territory: '$territory'
             },
             count: { $sum: 1 },
-            totalSacks: { $sum: "$totalSacksCount" },
-            totalWeight: { $sum: "$totalWeightKg" },
-          },
+            totalSacks: { $sum: '$totalSacksCount' },
+            totalWeight: { $sum: '$totalWeightKg' }
+          }
         },
-        { $sort: { "_id.year": 1, "_id.month": 1, "_id.week": 1 } },
+        { $sort: { '_id.year': 1, '_id.month': 1, '_id.week': 1 } }
       ]),
 
       // ── NEW: Territory detailed breakdown (territory → hybrid + flagging) ──
       territoryDetailedBreakdownRaw: Deployment.aggregate([
         { $match: deploymentFilter },
-        { $unwind: "$pickups" },
-        { $match: { "pickups.territory": { $exists: true, $ne: "" } } },
+        { $unwind: '$pickups' },
+        { $match: { 'pickups.territory': { $exists: true, $ne: '' } } },
         {
           $group: {
             _id: {
-              territory: "$pickups.territory",
-              hybrid: { $ifNull: ["$pickups.hybrid", "—"] },
-              flagging: { $ifNull: ["$pickups.flagging", "—"] },
+              territory: '$pickups.territory',
+              hybrid: { $ifNull: ['$pickups.hybrid', '—'] },
+              flagging: { $ifNull: ['$pickups.flagging', '—'] }
             },
             totalPickups: { $sum: 1 },
             completedPickups: {
-              $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] },
+              $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] }
             },
             ongoingPickups: {
-              $sum: { $cond: [{ $eq: ["$status", "ongoing"] }, 1, 0] },
+              $sum: { $cond: [{ $eq: ['$status', 'ongoing'] }, 1, 0] }
             },
             preparingPickups: {
-              $sum: { $cond: [{ $eq: ["$status", "preparing"] }, 1, 0] },
+              $sum: { $cond: [{ $eq: ['$status', 'preparing'] }, 1, 0] }
             },
             canceledPickups: {
-              $sum: { $cond: [{ $eq: ["$status", "canceled"] }, 1, 0] },
+              $sum: { $cond: [{ $eq: ['$status', 'canceled'] }, 1, 0] }
             },
             totalSacks: {
-              $sum: { $ifNull: ["$pickups.sacksCount", 0] },
+              $sum: { $ifNull: ['$pickups.sacksCount', 0] }
             },
             completedSacks: {
               $sum: {
                 $cond: [
-                  { $eq: ["$status", "completed"] },
-                  { $ifNull: ["$pickups.sacksCount", 0] },
-                  0,
-                ],
-              },
+                  { $eq: ['$status', 'completed'] },
+                  { $ifNull: ['$pickups.sacksCount', 0] },
+                  0
+                ]
+              }
             },
             totalEstWeight: {
               $sum: {
                 $convert: {
-                  input: "$pickups.estimatedWeightKg",
-                  to: "double",
+                  input: '$pickups.estimatedWeightKg',
+                  to: 'double',
                   onError: 0,
-                  onNull: 0,
-                },
-              },
+                  onNull: 0
+                }
+              }
             },
             totalFieldWeight: {
               $sum: {
                 $convert: {
-                  input: "$pickups.fieldWeightKg",
-                  to: "double",
+                  input: '$pickups.fieldWeightKg',
+                  to: 'double',
                   onError: 0,
-                  onNull: 0,
-                },
-              },
+                  onNull: 0
+                }
+              }
             },
             totalPlantWeight: {
               $sum: {
                 $convert: {
-                  input: "$pickups.plantWeightKg",
-                  to: "double",
+                  input: '$pickups.plantWeightKg',
+                  to: 'double',
                   onError: 0,
-                  onNull: 0,
-                },
-              },
+                  onNull: 0
+                }
+              }
             },
             completedPlantWeight: {
               $sum: {
                 $cond: [
-                  { $eq: ["$status", "completed"] },
+                  { $eq: ['$status', 'completed'] },
                   {
                     $convert: {
-                      input: "$pickups.plantWeightKg",
-                      to: "double",
+                      input: '$pickups.plantWeightKg',
+                      to: 'double',
                       onError: 0,
-                      onNull: 0,
-                    },
+                      onNull: 0
+                    }
                   },
-                  0,
-                ],
-              },
-            },
-          },
+                  0
+                ]
+              }
+            }
+          }
         },
         {
           $sort: {
-            "_id.territory": 1,
-            "_id.hybrid": 1,
-            "_id.flagging": 1,
-          },
-        },
-      ]),
-    };
+            '_id.territory': 1,
+            '_id.hybrid': 1,
+            '_id.flagging': 1
+          }
+        }
+      ])
+    }
 
-    const results = await Promise.all(Object.values(promises));
+    const results = await Promise.all(Object.values(promises))
     const data = Object.keys(promises).reduce((acc, key, index) => {
-      acc[key] = results[index];
-      return acc;
-    }, {});
+      acc[key] = results[index]
+      return acc
+    }, {})
 
     // ── Process subcon performance ────────────────────────────────────────
-    const processedSubconPerformance = {};
-    data.subconPerformance.forEach((item) => {
-      const subcon = item._id.subcon;
-      const status = item._id.status;
-      if (!subcon) return;
+    const processedSubconPerformance = {}
+    data.subconPerformance.forEach(item => {
+      const subcon = item._id.subcon
+      const status = item._id.status
+      if (!subcon) return
 
       if (!processedSubconPerformance[subcon]) {
         processedSubconPerformance[subcon] = {
@@ -1054,29 +1036,29 @@ const getDashboardAnalytics = async (req, res) => {
             preparing: 0,
             ongoing: 0,
             completed: 0,
-            canceled: 0,
-          },
-        };
+            canceled: 0
+          }
+        }
       }
 
-      processedSubconPerformance[subcon].totalDeployments += item.count;
-      processedSubconPerformance[subcon].totalSacks += item.totalSacks || 0;
-      processedSubconPerformance[subcon].totalWeight += item.totalWeight || 0;
+      processedSubconPerformance[subcon].totalDeployments += item.count
+      processedSubconPerformance[subcon].totalSacks += item.totalSacks || 0
+      processedSubconPerformance[subcon].totalWeight += item.totalWeight || 0
 
       if (
         status &&
         processedSubconPerformance[subcon].statusBreakdown[status] !== undefined
       ) {
-        processedSubconPerformance[subcon].statusBreakdown[status] = item.count;
+        processedSubconPerformance[subcon].statusBreakdown[status] = item.count
       }
-    });
+    })
 
     // ── Process territory / hybrid / flagging performance ─────────────────
     const buildPerformanceMap = (statusAnalytics, idField) => {
-      const map = {};
-      statusAnalytics.forEach((item) => {
-        const key = item._id[idField];
-        const status = item._id.status;
+      const map = {}
+      statusAnalytics.forEach(item => {
+        const key = item._id[idField]
+        const status = item._id.status
 
         if (!map[key]) {
           map[key] = {
@@ -1088,38 +1070,38 @@ const getDashboardAnalytics = async (req, res) => {
               preparing: 0,
               ongoing: 0,
               completed: 0,
-              canceled: 0,
-            },
-          };
+              canceled: 0
+            }
+          }
         }
 
-        map[key].totalDeployments += item.count;
-        map[key].totalSacks += item.totalSacks || 0;
-        map[key].totalWeight += item.totalWeight || 0;
+        map[key].totalDeployments += item.count
+        map[key].totalSacks += item.totalSacks || 0
+        map[key].totalWeight += item.totalWeight || 0
 
         if (status && map[key].statusBreakdown[status] !== undefined) {
-          map[key].statusBreakdown[status] = item.count;
+          map[key].statusBreakdown[status] = item.count
         }
-      });
-      return map;
-    };
+      })
+      return map
+    }
 
     const processedTerritoryPerformance = buildPerformanceMap(
       data.territoryStatusAnalytics,
-      "territory",
-    );
+      'territory'
+    )
     const processedHybridPerformance = buildPerformanceMap(
       data.hybridStatusAnalytics,
-      "hybrid",
-    );
+      'hybrid'
+    )
     const processedFlaggingPerformance = buildPerformanceMap(
       data.flaggingStatusAnalytics,
-      "flagging",
-    );
+      'flagging'
+    )
 
-    const formatPerformanceList = (map) =>
+    const formatPerformanceList = map =>
       Object.values(map)
-        .map((item) => ({
+        .map(item => ({
           ...item,
           completedDeployments: item.statusBreakdown.completed || 0,
           completionRate:
@@ -1129,49 +1111,49 @@ const getDashboardAnalytics = async (req, res) => {
                     item.totalDeployments) *
                   100
                 ).toFixed(1)
-              : "0",
+              : '0'
         }))
         .sort((a, b) => b.totalDeployments - a.totalDeployments)
-        .slice(0, 10);
+        .slice(0, 10)
 
     const formattedSubconPerformance = formatPerformanceList(
-      processedSubconPerformance,
-    );
+      processedSubconPerformance
+    )
     const formattedTerritoryPerformance = formatPerformanceList(
-      processedTerritoryPerformance,
-    );
+      processedTerritoryPerformance
+    )
     const formattedHybridPerformance = formatPerformanceList(
-      processedHybridPerformance,
-    );
+      processedHybridPerformance
+    )
     const formattedFlaggingPerformance = formatPerformanceList(
-      processedFlaggingPerformance,
-    );
+      processedFlaggingPerformance
+    )
 
     // ── Build territoryDetailedBreakdown ──────────────────────────────────
     const formatArrayData = (array, fallback = []) =>
-      Array.isArray(array) && array.length > 0 ? array : fallback;
+      Array.isArray(array) && array.length > 0 ? array : fallback
 
-    const territoryMap = {};
-    formatArrayData(data.territoryDetailedBreakdownRaw).forEach((row) => {
-      const { territory, hybrid, flagging } = row._id;
-      if (!territory) return;
+    const territoryMap = {}
+    formatArrayData(data.territoryDetailedBreakdownRaw).forEach(row => {
+      const { territory, hybrid, flagging } = row._id
+      if (!territory) return
 
       if (!territoryMap[territory]) {
-        territoryMap[territory] = { territory, hybrids: [] };
+        territoryMap[territory] = { territory, hybrids: [] }
       }
 
-      const total = row.totalPickups || 0;
+      const total = row.totalPickups || 0
 
       territoryMap[territory].hybrids.push({
-        hybrid: hybrid || "—",
-        flagging: flagging || "—",
+        hybrid: hybrid || '—',
+        flagging: flagging || '—',
         totalPickups: total,
         completedPickups: row.completedPickups || 0,
         ongoingPickups: row.ongoingPickups || 0,
         preparingPickups: row.preparingPickups || 0,
         canceledPickups: row.canceledPickups || 0,
         completionRate:
-          total > 0 ? ((row.completedPickups / total) * 100).toFixed(1) : "0",
+          total > 0 ? ((row.completedPickups / total) * 100).toFixed(1) : '0',
         totalSacks: row.totalSacks || 0,
         completedSacks: row.completedSacks || 0,
         avgSacks:
@@ -1182,23 +1164,23 @@ const getDashboardAnalytics = async (req, res) => {
         totalFieldWeight: parseFloat((row.totalFieldWeight || 0).toFixed(2)),
         totalPlantWeight: parseFloat((row.totalPlantWeight || 0).toFixed(2)),
         completedPlantWeight: parseFloat(
-          (row.completedPlantWeight || 0).toFixed(2),
+          (row.completedPlantWeight || 0).toFixed(2)
         ),
         avgPlantWeight:
           total > 0
             ? parseFloat(((row.totalPlantWeight || 0) / total).toFixed(2))
-            : 0,
-      });
-    });
+            : 0
+      })
+    })
 
     // Compute territory-level totals and sort territories alphabetically
     const territoryDetailedBreakdown = Object.values(territoryMap)
-      .map((t) => {
-        const h = t.hybrids;
-        const sumField = (fn) => h.reduce((acc, r) => acc + fn(r), 0);
+      .map(t => {
+        const h = t.hybrids
+        const sumField = fn => h.reduce((acc, r) => acc + fn(r), 0)
 
-        const totalPickups = sumField((r) => r.totalPickups);
-        const completedPickups = sumField((r) => r.completedPickups);
+        const totalPickups = sumField(r => r.totalPickups)
+        const completedPickups = sumField(r => r.completedPickups)
 
         t.totals = {
           totalPickups,
@@ -1206,240 +1188,236 @@ const getDashboardAnalytics = async (req, res) => {
           completionRate:
             totalPickups > 0
               ? ((completedPickups / totalPickups) * 100).toFixed(1)
-              : "0",
-          totalSacks: sumField((r) => r.totalSacks),
-          completedSacks: sumField((r) => r.completedSacks),
+              : '0',
+          totalSacks: sumField(r => r.totalSacks),
+          completedSacks: sumField(r => r.completedSacks),
           totalEstWeight: parseFloat(
-            sumField((r) => r.totalEstWeight).toFixed(2),
+            sumField(r => r.totalEstWeight).toFixed(2)
           ),
           totalFieldWeight: parseFloat(
-            sumField((r) => r.totalFieldWeight).toFixed(2),
+            sumField(r => r.totalFieldWeight).toFixed(2)
           ),
           totalPlantWeight: parseFloat(
-            sumField((r) => r.totalPlantWeight).toFixed(2),
+            sumField(r => r.totalPlantWeight).toFixed(2)
           ),
           completedPlantWeight: parseFloat(
-            sumField((r) => r.completedPlantWeight).toFixed(2),
-          ),
-        };
+            sumField(r => r.completedPlantWeight).toFixed(2)
+          )
+        }
 
-        return t;
+        return t
       })
-      .sort((a, b) => a.territory.localeCompare(b.territory));
+      .sort((a, b) => a.territory.localeCompare(b.territory))
 
     // ── Derived metrics ───────────────────────────────────────────────────
-    const totalDeployments = data.totalDeployments;
+    const totalDeployments = data.totalDeployments
 
     const completionRate =
       totalDeployments > 0
         ? ((data.completedDeployments / totalDeployments) * 100).toFixed(1)
-        : 0;
+        : 0
     const cancellationRate =
       totalDeployments > 0
         ? ((data.cancelledDeployments / totalDeployments) * 100).toFixed(1)
-        : 0;
+        : 0
     const finalizedDeployments =
-      data.completedDeployments + data.cancelledDeployments;
+      data.completedDeployments + data.cancelledDeployments
     const successRate =
       finalizedDeployments > 0
         ? ((data.completedDeployments / finalizedDeployments) * 100).toFixed(1)
-        : 0;
+        : 0
 
-    const totalSacks = data.totalSacksAggregate[0]?.totalSacks || 0;
-    const totalWeight = data.totalSacksAggregate[0]?.totalWeight || 0;
+    const totalSacks = data.totalSacksAggregate[0]?.totalSacks || 0
+    const totalWeight = data.totalSacksAggregate[0]?.totalWeight || 0
 
-    const efficiencyData = data.deploymentEfficiency[0] || {};
-    const avgSacks = efficiencyData.avgSacks || 0;
-    const avgWeight = efficiencyData.avgWeight || 0;
-    const maxSacks = efficiencyData.maxSacks || 0;
-    const maxWeight = efficiencyData.maxWeight || 0;
+    const efficiencyData = data.deploymentEfficiency[0] || {}
+    const avgSacks = efficiencyData.avgSacks || 0
+    const avgWeight = efficiencyData.avgWeight || 0
+    const maxSacks = efficiencyData.maxSacks || 0
+    const maxWeight = efficiencyData.maxWeight || 0
 
-    const completedCargoData = data.completedCargoMetrics[0] || {};
-    const totalCompletedSacks = completedCargoData.totalCompletedSacks || 0;
-    const totalCompletedWeight = completedCargoData.totalCompletedWeight || 0;
-    const avgCompletedSacks = completedCargoData.avgCompletedSacks || 0;
-    const avgCompletedWeight = completedCargoData.avgCompletedWeight || 0;
-    const maxCompletedSacks = completedCargoData.maxCompletedSacks || 0;
-    const maxCompletedWeight = completedCargoData.maxCompletedWeight || 0;
+    const completedCargoData = data.completedCargoMetrics[0] || {}
+    const totalCompletedSacks = completedCargoData.totalCompletedSacks || 0
+    const totalCompletedWeight = completedCargoData.totalCompletedWeight || 0
+    const avgCompletedSacks = completedCargoData.avgCompletedSacks || 0
+    const avgCompletedWeight = completedCargoData.avgCompletedWeight || 0
+    const maxCompletedSacks = completedCargoData.maxCompletedSacks || 0
+    const maxCompletedWeight = completedCargoData.maxCompletedWeight || 0
 
     const utilizationRate =
       data.totalTrucks > 0
         ? ((data.deployedTrucks / data.totalTrucks) * 100).toFixed(1)
-        : 0;
+        : 0
     const driverUtilizationRate =
       data.totalDrivers > 0
         ? ((data.deployedDrivers / data.totalDrivers) * 100).toFixed(1)
-        : 0;
+        : 0
 
-    const userLoginData = data.userLoginAnalytics[0] || {};
-    const totalLogins = userLoginData.totalLogins || 0;
-    const avgLoginCount = userLoginData.avgLoginCount || 0;
-    const maxLoginCount = userLoginData.maxLoginCount || 0;
+    const userLoginData = data.userLoginAnalytics[0] || {}
+    const totalLogins = userLoginData.totalLogins || 0
+    const avgLoginCount = userLoginData.avgLoginCount || 0
+    const maxLoginCount = userLoginData.maxLoginCount || 0
 
     const totalOngoingDeployments =
-      (data.preparingDeployments || 0) + (data.ongoingDeployments || 0);
+      (data.preparingDeployments || 0) + (data.ongoingDeployments || 0)
 
     const weeklyTrendsData = formatArrayData(
-      data.weeklyDeploymentStatusAnalytics,
-    );
-    const dailyTrendsData = formatArrayData(
-      data.dailyDeploymentStatusAnalytics,
-    );
-    const weeklySacksData = formatArrayData(data.weeklySacksAnalytics);
-    const weeklyWeightData = formatArrayData(data.weeklyWeightAnalytics);
+      data.weeklyDeploymentStatusAnalytics
+    )
+    const dailyTrendsData = formatArrayData(data.dailyDeploymentStatusAnalytics)
+    const weeklySacksData = formatArrayData(data.weeklySacksAnalytics)
+    const weeklyWeightData = formatArrayData(data.weeklyWeightAnalytics)
 
-    const deploymentStatusData = formatArrayData(
-      data.deploymentStatusAnalytics,
-    );
+    const deploymentStatusData = formatArrayData(data.deploymentStatusAnalytics)
     const deploymentStatusMap = {
-      completed: "Completed",
-      ongoing: "Ongoing",
-      canceled: "Cancelled",
-      preparing: "Preparing",
-    };
+      completed: 'Completed',
+      ongoing: 'Ongoing',
+      canceled: 'Cancelled',
+      preparing: 'Preparing'
+    }
 
-    const userRoleData = formatArrayData(data.userRoleAnalytics);
-    const userStatusData = formatArrayData(data.userStatusAnalytics);
+    const userRoleData = formatArrayData(data.userRoleAnalytics)
+    const userStatusData = formatArrayData(data.userStatusAnalytics)
 
     const subconData = formatArrayData(data.subconAnalytics).filter(
-      (item) => item._id && item._id !== "",
-    );
+      item => item._id && item._id !== ''
+    )
 
     const formatWeekLabel = (year, month, week) => {
       const monthNames = [
-        "Jan",
-        "Feb",
-        "Mar",
-        "Apr",
-        "May",
-        "Jun",
-        "Jul",
-        "Aug",
-        "Sep",
-        "Oct",
-        "Nov",
-        "Dec",
-      ];
-      const startDay = (week - 1) * 7 + 1;
-      const endDay = Math.min(startDay + 6, new Date(year, month, 0).getDate());
-      return `${monthNames[month - 1]} ${startDay}-${endDay}`;
-    };
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec'
+      ]
+      const startDay = (week - 1) * 7 + 1
+      const endDay = Math.min(startDay + 6, new Date(year, month, 0).getDate())
+      return `${monthNames[month - 1]} ${startDay}-${endDay}`
+    }
 
     const formatDayLabel = (year, month, day) => {
       const monthNames = [
-        "Jan",
-        "Feb",
-        "Mar",
-        "Apr",
-        "May",
-        "Jun",
-        "Jul",
-        "Aug",
-        "Sep",
-        "Oct",
-        "Nov",
-        "Dec",
-      ];
-      return `${monthNames[month - 1]} ${day}`;
-    };
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec'
+      ]
+      return `${monthNames[month - 1]} ${day}`
+    }
 
-    const processWeeklyDeploymentData = (weeklyData) => {
-      if (!weeklyData || weeklyData.length === 0) return [];
-      const weeklyMap = {};
-      weeklyData.forEach((item) => {
-        const { year, month, week, status } = item._id;
-        const count = item.count || 0;
-        const weekKey = `${year}-${month}-${week}`;
+    const processWeeklyDeploymentData = weeklyData => {
+      if (!weeklyData || weeklyData.length === 0) return []
+      const weeklyMap = {}
+      weeklyData.forEach(item => {
+        const { year, month, week, status } = item._id
+        const count = item.count || 0
+        const weekKey = `${year}-${month}-${week}`
         if (!weeklyMap[weekKey]) {
-          weeklyMap[weekKey] = { year, month, week, completed: 0 };
+          weeklyMap[weekKey] = { year, month, week, completed: 0 }
         }
-        if (status === "completed") weeklyMap[weekKey].completed = count;
-      });
+        if (status === 'completed') weeklyMap[weekKey].completed = count
+      })
       return Object.values(weeklyMap)
         .sort((a, b) => {
-          if (a.year !== b.year) return a.year - b.year;
-          if (a.month !== b.month) return a.month - b.month;
-          return a.week - b.week;
+          if (a.year !== b.year) return a.year - b.year
+          if (a.month !== b.month) return a.month - b.month
+          return a.week - b.week
         })
-        .map((week) => ({
+        .map(week => ({
           ...week,
-          label: formatWeekLabel(week.year, week.month, week.week),
-        }));
-    };
+          label: formatWeekLabel(week.year, week.month, week.week)
+        }))
+    }
 
-    const processDailyDeploymentData = (dailyData) => {
-      if (!dailyData || dailyData.length === 0) return [];
-      const dailyMap = {};
-      dailyData.forEach((item) => {
-        const { year, month, day, status } = item._id;
-        const count = item.count || 0;
-        const dayKey = `${year}-${month}-${day}`;
+    const processDailyDeploymentData = dailyData => {
+      if (!dailyData || dailyData.length === 0) return []
+      const dailyMap = {}
+      dailyData.forEach(item => {
+        const { year, month, day, status } = item._id
+        const count = item.count || 0
+        const dayKey = `${year}-${month}-${day}`
         if (!dailyMap[dayKey]) {
-          dailyMap[dayKey] = { year, month, day, completed: 0 };
+          dailyMap[dayKey] = { year, month, day, completed: 0 }
         }
-        if (status === "completed") dailyMap[dayKey].completed = count;
-      });
+        if (status === 'completed') dailyMap[dayKey].completed = count
+      })
       return Object.values(dailyMap)
         .sort((a, b) => {
-          if (a.year !== b.year) return a.year - b.year;
-          if (a.month !== b.month) return a.month - b.month;
-          return a.day - b.day;
+          if (a.year !== b.year) return a.year - b.year
+          if (a.month !== b.month) return a.month - b.month
+          return a.day - b.day
         })
-        .map((day) => ({
+        .map(day => ({
           ...day,
-          label: formatDayLabel(day.year, day.month, day.day),
-        }));
-    };
+          label: formatDayLabel(day.year, day.month, day.day)
+        }))
+    }
 
-    const processWeeklySacksData = (weeklyData) => {
-      if (!weeklyData || weeklyData.length === 0) return [];
+    const processWeeklySacksData = weeklyData => {
+      if (!weeklyData || weeklyData.length === 0) return []
       return weeklyData
-        .filter((item) => item.totalSacks > 0 || item.deploymentCount > 0)
+        .filter(item => item.totalSacks > 0 || item.deploymentCount > 0)
         .sort((a, b) => {
-          if (a._id.year !== b._id.year) return a._id.year - b._id.year;
-          if (a._id.month !== b._id.month) return a._id.month - b._id.month;
-          return a._id.week - b._id.week;
+          if (a._id.year !== b._id.year) return a._id.year - b._id.year
+          if (a._id.month !== b._id.month) return a._id.month - b._id.month
+          return a._id.week - b._id.week
         })
-        .map((item) => ({
+        .map(item => ({
           ...item,
-          label: formatWeekLabel(item._id.year, item._id.month, item._id.week),
-        }));
-    };
+          label: formatWeekLabel(item._id.year, item._id.month, item._id.week)
+        }))
+    }
 
-    const processWeeklyWeightData = (weeklyData) => {
-      if (!weeklyData || weeklyData.length === 0) return [];
+    const processWeeklyWeightData = weeklyData => {
+      if (!weeklyData || weeklyData.length === 0) return []
       return weeklyData
-        .filter((item) => item.totalWeight > 0 || item.deploymentCount > 0)
+        .filter(item => item.totalWeight > 0 || item.deploymentCount > 0)
         .sort((a, b) => {
-          if (a._id.year !== b._id.year) return a._id.year - b._id.year;
-          if (a._id.month !== b._id.month) return a._id.month - b._id.month;
-          return a._id.week - b._id.week;
+          if (a._id.year !== b._id.year) return a._id.year - b._id.year
+          if (a._id.month !== b._id.month) return a._id.month - b._id.month
+          return a._id.week - b._id.week
         })
-        .map((item) => ({
+        .map(item => ({
           ...item,
-          label: formatWeekLabel(item._id.year, item._id.month, item._id.week),
-        }));
-    };
+          label: formatWeekLabel(item._id.year, item._id.month, item._id.week)
+        }))
+    }
 
     const processedWeeklyDeployments =
-      processWeeklyDeploymentData(weeklyTrendsData);
+      processWeeklyDeploymentData(weeklyTrendsData)
     const processedDailyDeployments =
-      processDailyDeploymentData(dailyTrendsData);
-    const processedWeeklySacks = processWeeklySacksData(weeklySacksData);
-    const processedWeeklyWeight = processWeeklyWeightData(weeklyWeightData);
+      processDailyDeploymentData(dailyTrendsData)
+    const processedWeeklySacks = processWeeklySacksData(weeklySacksData)
+    const processedWeeklyWeight = processWeeklyWeightData(weeklyWeightData)
 
     const formattedPickupSites = formatArrayData(data.topPickupSites).map(
-      (site) => ({
+      site => ({
         name: site._id,
         count: site.count,
         totalSacks: site.totalSacks,
-        totalWeight: site.totalWeight,
-      }),
-    );
+        totalWeight: site.totalWeight
+      })
+    )
 
     const formattedTerritoryMetrics = formatArrayData(data.territoryPerformance)
-      .map((item) => ({
-        _id: item._id || "Unknown",
+      .map(item => ({
+        _id: item._id || 'Unknown',
         count: item.count || 0,
         completed: item.completed || 0,
         completionRate: parseFloat((item.completionRate || 0).toFixed(1)),
@@ -1448,9 +1426,9 @@ const getDashboardAnalytics = async (req, res) => {
         completedSacks: item.completedSacks || 0,
         completedWeight: item.completedWeight || 0,
         avgSacks: parseFloat((item.avgSacks || 0).toFixed(1)),
-        avgWeight: parseFloat((item.avgWeight || 0).toFixed(1)),
+        avgWeight: parseFloat((item.avgWeight || 0).toFixed(1))
       }))
-      .filter((item) => item._id !== "Unknown" && item._id !== null);
+      .filter(item => item._id !== 'Unknown' && item._id !== null)
 
     const analyticsData = {
       overview: {
@@ -1497,254 +1475,252 @@ const getDashboardAnalytics = async (req, res) => {
         maxLoginCount: maxLoginCount || 0,
         totalTerritories: formatArrayData(data.territoryAnalytics).length || 0,
         totalHybrids: formatArrayData(data.hybridAnalytics).length || 0,
-        totalFlaggings: formatArrayData(data.flaggingAnalytics).length || 0,
+        totalFlaggings: formatArrayData(data.flaggingAnalytics).length || 0
       },
 
       charts: {
         weeklyDeployments: {
-          labels: processedWeeklyDeployments.map((item) => item.label),
+          labels: processedWeeklyDeployments.map(item => item.label),
           completedData: processedWeeklyDeployments.map(
-            (item) => item.completed || 0,
-          ),
+            item => item.completed || 0
+          )
         },
         dailyDeployments: {
-          labels: processedDailyDeployments.map((item) => item.label),
+          labels: processedDailyDeployments.map(item => item.label),
           completedData: processedDailyDeployments.map(
-            (item) => item.completed || 0,
-          ),
+            item => item.completed || 0
+          )
         },
         weeklySacks: {
-          labels: processedWeeklySacks.map((item) => item.label),
-          data: processedWeeklySacks.map((item) => item.totalSacks || 0),
+          labels: processedWeeklySacks.map(item => item.label),
+          data: processedWeeklySacks.map(item => item.totalSacks || 0),
           deploymentCounts: processedWeeklySacks.map(
-            (item) => item.deploymentCount || 0,
+            item => item.deploymentCount || 0
           ),
-          avgSacks: processedWeeklySacks.map((item) =>
-            parseFloat((item.avgSacksPerDeployment || 0).toFixed(1)),
-          ),
+          avgSacks: processedWeeklySacks.map(item =>
+            parseFloat((item.avgSacksPerDeployment || 0).toFixed(1))
+          )
         },
         weeklyWeight: {
-          labels: processedWeeklyWeight.map((item) => item.label),
-          data: processedWeeklyWeight.map((item) => item.totalWeight || 0),
+          labels: processedWeeklyWeight.map(item => item.label),
+          data: processedWeeklyWeight.map(item => item.totalWeight || 0),
           deploymentCounts: processedWeeklyWeight.map(
-            (item) => item.deploymentCount || 0,
+            item => item.deploymentCount || 0
           ),
-          avgWeight: processedWeeklyWeight.map((item) =>
-            parseFloat((item.avgWeightPerDeployment || 0).toFixed(1)),
-          ),
+          avgWeight: processedWeeklyWeight.map(item =>
+            parseFloat((item.avgWeightPerDeployment || 0).toFixed(1))
+          )
         },
         weeklyWeightBreakdown: (() => {
-          const raw = formatArrayData(data.weeklyWeightBreakdown);
+          const raw = formatArrayData(data.weeklyWeightBreakdown)
           return {
-            labels: raw.map((item) =>
-              formatWeekLabel(item._id.year, item._id.month, item._id.week),
+            labels: raw.map(item =>
+              formatWeekLabel(item._id.year, item._id.month, item._id.week)
             ),
-            estWeight: raw.map((item) =>
-              parseFloat((item.totalEstWeight || 0).toFixed(2)),
+            estWeight: raw.map(item =>
+              parseFloat((item.totalEstWeight || 0).toFixed(2))
             ),
-            fieldWeight: raw.map((item) =>
-              parseFloat((item.totalFieldWeight || 0).toFixed(2)),
+            fieldWeight: raw.map(item =>
+              parseFloat((item.totalFieldWeight || 0).toFixed(2))
             ),
-            plantWeight: raw.map((item) =>
-              parseFloat((item.totalPlantWeight || 0).toFixed(2)),
-            ),
-          };
+            plantWeight: raw.map(item =>
+              parseFloat((item.totalPlantWeight || 0).toFixed(2))
+            )
+          }
         })(),
         dailyWeightBreakdown: (() => {
-          const raw = formatArrayData(data.dailyWeightBreakdown);
+          const raw = formatArrayData(data.dailyWeightBreakdown)
           return {
-            labels: raw.map((item) =>
-              formatDayLabel(item._id.year, item._id.month, item._id.day),
+            labels: raw.map(item =>
+              formatDayLabel(item._id.year, item._id.month, item._id.day)
             ),
-            estWeight: raw.map((item) =>
-              parseFloat((item.totalEstWeight || 0).toFixed(2)),
+            estWeight: raw.map(item =>
+              parseFloat((item.totalEstWeight || 0).toFixed(2))
             ),
-            fieldWeight: raw.map((item) =>
-              parseFloat((item.totalFieldWeight || 0).toFixed(2)),
+            fieldWeight: raw.map(item =>
+              parseFloat((item.totalFieldWeight || 0).toFixed(2))
             ),
-            plantWeight: raw.map((item) =>
-              parseFloat((item.totalPlantWeight || 0).toFixed(2)),
-            ),
-          };
+            plantWeight: raw.map(item =>
+              parseFloat((item.totalPlantWeight || 0).toFixed(2))
+            )
+          }
         })(),
         deploymentStatus: {
           labels: deploymentStatusData.map(
-            (item) => deploymentStatusMap[item._id] || item._id || "Unknown",
+            item => deploymentStatusMap[item._id] || item._id || 'Unknown'
           ),
-          data: deploymentStatusData.map((item) => item.count || 0),
+          data: deploymentStatusData.map(item => item.count || 0)
         },
         pickupSites: {
           data: formattedPickupSites,
-          labels: formattedPickupSites.map((item) => item.name),
-          counts: formattedPickupSites.map((item) => item.count),
-          sacks: formattedPickupSites.map((item) => item.totalSacks),
-          weights: formattedPickupSites.map((item) => item.totalWeight),
+          labels: formattedPickupSites.map(item => item.name),
+          counts: formattedPickupSites.map(item => item.count),
+          sacks: formattedPickupSites.map(item => item.totalSacks),
+          weights: formattedPickupSites.map(item => item.totalWeight)
         },
         truckTypes: {
           labels: formatArrayData(data.truckTypeAnalytics).map(
-            (item) => item._id || "Unknown",
+            item => item._id || 'Unknown'
           ),
           data: formatArrayData(data.truckTypeAnalytics).map(
-            (item) => item.count || 0,
-          ),
+            item => item.count || 0
+          )
         },
         truckStatus: {
           labels: formatArrayData(data.truckStatusAnalytics).map(
-            (item) => item._id || "Unknown",
+            item => item._id || 'Unknown'
           ),
           data: formatArrayData(data.truckStatusAnalytics).map(
-            (item) => item.count || 0,
-          ),
+            item => item.count || 0
+          )
         },
         driverStatus: {
           labels: formatArrayData(data.driverStatusAnalytics).map(
-            (item) => item._id || "Unknown",
+            item => item._id || 'Unknown'
           ),
           data: formatArrayData(data.driverStatusAnalytics).map(
-            (item) => item.count || 0,
-          ),
+            item => item.count || 0
+          )
         },
         userRoles: {
-          labels: userRoleData.map((item) => {
+          labels: userRoleData.map(item => {
             const userRoleMap = {
-              head_admin: "Head Admin",
-              admin: "Admin",
-              visitor: "Visitor",
-              subcon: "Subcontractor",
-            };
-            return userRoleMap[item._id] || item._id || "Unknown";
+              head_admin: 'Head Admin',
+              admin: 'Admin',
+              visitor: 'Visitor',
+              subcon: 'Subcontractor'
+            }
+            return userRoleMap[item._id] || item._id || 'Unknown'
           }),
-          data: userRoleData.map((item) => item.count || 0),
+          data: userRoleData.map(item => item.count || 0)
         },
         userStatus: {
-          labels: userStatusData.map((item) => {
+          labels: userStatusData.map(item => {
             const userStatusMap = {
-              active: "Active",
-              inactive: "Inactive",
-              pending: "Pending",
-              rejected: "Rejected",
-              revoked: "Revoked",
-            };
-            return userStatusMap[item._id] || item._id || "Unknown";
+              active: 'Active',
+              inactive: 'Inactive',
+              pending: 'Pending',
+              rejected: 'Rejected',
+              revoked: 'Revoked'
+            }
+            return userStatusMap[item._id] || item._id || 'Unknown'
           }),
-          data: userStatusData.map((item) => item.count || 0),
+          data: userStatusData.map(item => item.count || 0)
         },
         subconDistribution: {
-          labels: subconData.map((item) => item._id),
-          data: subconData.map((item) => item.count || 0),
+          labels: subconData.map(item => item._id),
+          data: subconData.map(item => item.count || 0)
         },
         subconPerformance: {
           data: formattedSubconPerformance,
-          labels: formattedSubconPerformance.map((item) => item.name),
+          labels: formattedSubconPerformance.map(item => item.name),
           totalDeployments: formattedSubconPerformance.map(
-            (item) => item.totalDeployments,
+            item => item.totalDeployments
           ),
           completedDeployments: formattedSubconPerformance.map(
-            (item) => item.completedDeployments,
+            item => item.completedDeployments
           ),
-          completionRates: formattedSubconPerformance.map((item) =>
-            parseFloat(item.completionRate),
+          completionRates: formattedSubconPerformance.map(item =>
+            parseFloat(item.completionRate)
           ),
           statusBreakdown: formattedSubconPerformance.map(
-            (item) => item.statusBreakdown,
-          ),
+            item => item.statusBreakdown
+          )
         },
         territoryDistribution: {
           labels: formatArrayData(data.territoryAnalytics).map(
-            (item) => item._id || "Unknown",
+            item => item._id || 'Unknown'
           ),
           data: formatArrayData(data.territoryAnalytics).map(
-            (item) => item.count || 0,
-          ),
+            item => item.count || 0
+          )
         },
         hybridDistribution: {
           labels: formatArrayData(data.hybridAnalytics).map(
-            (item) => item._id || "Unknown",
+            item => item._id || 'Unknown'
           ),
           data: formatArrayData(data.hybridAnalytics).map(
-            (item) => item.count || 0,
-          ),
+            item => item.count || 0
+          )
         },
         flaggingDistribution: {
           labels: formatArrayData(data.flaggingAnalytics).map(
-            (item) => item._id || "Unknown",
+            item => item._id || 'Unknown'
           ),
           data: formatArrayData(data.flaggingAnalytics).map(
-            (item) => item.count || 0,
-          ),
+            item => item.count || 0
+          )
         },
         territoryPerformance: {
           data: formattedTerritoryPerformance,
-          labels: formattedTerritoryPerformance.map((item) => item.name),
+          labels: formattedTerritoryPerformance.map(item => item.name),
           totalDeployments: formattedTerritoryPerformance.map(
-            (item) => item.totalDeployments,
+            item => item.totalDeployments
           ),
           completedDeployments: formattedTerritoryPerformance.map(
-            (item) => item.completedDeployments,
+            item => item.completedDeployments
           ),
-          completionRates: formattedTerritoryPerformance.map((item) =>
-            parseFloat(item.completionRate),
+          completionRates: formattedTerritoryPerformance.map(item =>
+            parseFloat(item.completionRate)
           ),
           statusBreakdown: formattedTerritoryPerformance.map(
-            (item) => item.statusBreakdown,
-          ),
+            item => item.statusBreakdown
+          )
         },
         hybridPerformance: {
           data: formattedHybridPerformance,
-          labels: formattedHybridPerformance.map((item) => item.name),
+          labels: formattedHybridPerformance.map(item => item.name),
           totalDeployments: formattedHybridPerformance.map(
-            (item) => item.totalDeployments,
+            item => item.totalDeployments
           ),
           completedDeployments: formattedHybridPerformance.map(
-            (item) => item.completedDeployments,
+            item => item.completedDeployments
           ),
-          completionRates: formattedHybridPerformance.map((item) =>
-            parseFloat(item.completionRate),
+          completionRates: formattedHybridPerformance.map(item =>
+            parseFloat(item.completionRate)
           ),
           statusBreakdown: formattedHybridPerformance.map(
-            (item) => item.statusBreakdown,
-          ),
+            item => item.statusBreakdown
+          )
         },
         flaggingPerformance: {
           data: formattedFlaggingPerformance,
-          labels: formattedFlaggingPerformance.map((item) => item.name),
+          labels: formattedFlaggingPerformance.map(item => item.name),
           totalDeployments: formattedFlaggingPerformance.map(
-            (item) => item.totalDeployments,
+            item => item.totalDeployments
           ),
           completedDeployments: formattedFlaggingPerformance.map(
-            (item) => item.completedDeployments,
+            item => item.completedDeployments
           ),
-          completionRates: formattedFlaggingPerformance.map((item) =>
-            parseFloat(item.completionRate),
+          completionRates: formattedFlaggingPerformance.map(item =>
+            parseFloat(item.completionRate)
           ),
           statusBreakdown: formattedFlaggingPerformance.map(
-            (item) => item.statusBreakdown,
-          ),
-        },
+            item => item.statusBreakdown
+          )
+        }
       },
 
       topDrivers: formatArrayData(data.topDriversByTrips),
       territoryMetrics: formattedTerritoryMetrics,
 
-      hybridMetrics: formatArrayData(data.hybridPerformance).map((item) => ({
-        _id: item._id || "Unknown",
+      hybridMetrics: formatArrayData(data.hybridPerformance).map(item => ({
+        _id: item._id || 'Unknown',
         count: item.count || 0,
         totalSacks: item.totalSacks || 0,
         totalWeight: item.totalWeight || 0,
         avgSacks: parseFloat((item.avgSacks || 0).toFixed(1)),
-        avgWeight: parseFloat((item.avgWeight || 0).toFixed(1)),
+        avgWeight: parseFloat((item.avgWeight || 0).toFixed(1))
       })),
 
-      flaggingMetrics: formatArrayData(data.flaggingPerformance).map(
-        (item) => ({
-          _id: item._id || "Unknown",
-          count: item.count || 0,
-          totalSacks: item.totalSacks || 0,
-          totalWeight: item.totalWeight || 0,
-          avgSacks: parseFloat((item.avgSacks || 0).toFixed(1)),
-          avgWeight: parseFloat((item.avgWeight || 0).toFixed(1)),
-        }),
-      ),
+      flaggingMetrics: formatArrayData(data.flaggingPerformance).map(item => ({
+        _id: item._id || 'Unknown',
+        count: item.count || 0,
+        totalSacks: item.totalSacks || 0,
+        totalWeight: item.totalWeight || 0,
+        avgSacks: parseFloat((item.avgSacks || 0).toFixed(1)),
+        avgWeight: parseFloat((item.avgWeight || 0).toFixed(1))
+      })),
 
       performanceMetrics: {
         totalDeployments,
@@ -1789,24 +1765,21 @@ const getDashboardAnalytics = async (req, res) => {
         maxLoginCount: maxLoginCount || 0,
         territoryCount: formatArrayData(data.territoryAnalytics).length || 0,
         hybridCount: formatArrayData(data.hybridAnalytics).length || 0,
-        flaggingCount: formatArrayData(data.flaggingAnalytics).length || 0,
+        flaggingCount: formatArrayData(data.flaggingAnalytics).length || 0
       },
 
       // ── NEW: Territory detailed breakdown ──────────────────────────────
-      territoryDetailedBreakdown,
+      territoryDetailedBreakdown
+    }
 
-      // ── Expose the active company filter to the client ─────────────────
-      activeCompanyFilter: companyParam || null,
-    };
-
-    if (req.user.role === "subcon" && req.user.subcon) {
+    if (req.user.role === 'subcon' && req.user.subcon) {
       analyticsData.subconAnalytics = {
         drivers: {
           performance: formatArrayData(data.subconDriverPerformance),
           status: formatArrayData(data.subconDriverStatusAnalytics),
           total: data.totalDrivers || 0,
           available: data.availableDrivers || 0,
-          deployed: data.deployedDrivers || 0,
+          deployed: data.deployedDrivers || 0
         },
         trucks: {
           performance: formatArrayData(data.subconTruckPerformance),
@@ -1814,36 +1787,36 @@ const getDashboardAnalytics = async (req, res) => {
           types: formatArrayData(data.subconTruckTypeAnalytics),
           total: data.totalTrucks || 0,
           available: data.availableTrucks || 0,
-          deployed: data.deployedTrucks || 0,
+          deployed: data.deployedTrucks || 0
         },
         territories: {
           distribution: formatArrayData(data.territoryAnalytics),
-          performance: formatArrayData(data.territoryPerformance),
+          performance: formatArrayData(data.territoryPerformance)
         },
         hybrids: {
           distribution: formatArrayData(data.hybridAnalytics),
-          performance: formatArrayData(data.hybridPerformance),
+          performance: formatArrayData(data.hybridPerformance)
         },
         flaggings: {
           distribution: formatArrayData(data.flaggingAnalytics),
-          performance: formatArrayData(data.flaggingPerformance),
-        },
-      };
+          performance: formatArrayData(data.flaggingPerformance)
+        }
+      }
     }
 
     res.json({
       success: true,
       data: analyticsData,
-      timestamp: new Date().toISOString(),
-    });
+      timestamp: new Date().toISOString()
+    })
   } catch (error) {
-    console.error("Analytics error:", error);
+    console.error('Analytics error:', error)
     res.status(500).json({
       success: false,
-      message: "Error fetching analytics data",
-      error: error.message,
-    });
+      message: 'Error fetching analytics data',
+      error: error.message
+    })
   }
-};
+}
 
-module.exports = { getDashboardAnalytics };
+module.exports = { getDashboardAnalytics }

@@ -18,28 +18,24 @@ const sameId = (a, b) => {
 
 // ─── Replacement helpers ───────────────────────────────────────────────────────
 
-// Returns the latest populated replacement truck (populated or raw ObjectId)
 const getActiveReplacementTruck = deployment =>
   deployment.replacements
     ?.slice()
     .reverse()
     .find(r => r.replacementTruckId)?.replacementTruckId || null
 
-// Returns the latest populated replacement driver
 const getActiveReplacementDriver = deployment =>
   deployment.replacements
     ?.slice()
     .reverse()
     .find(r => r.replacementDriverId)?.replacementDriverId || null
 
-// Helper: get active subcon (latest replacement truck takes priority)
 const getActiveSubcon = deployment => {
   const activeTruck = getActiveReplacementTruck(deployment)
   if (activeTruck?.subcon) return activeTruck.subcon
   return deployment.truckId?.subcon || ''
 }
 
-// Helper: map a pickup object, preserving tmoNo if it exists
 const mapPickup = p => ({
   tmoNo: p.tmoNo || undefined,
   pickupSite: p.pickupSite,
@@ -62,7 +58,6 @@ const mapPickup = p => ({
   flaggingRemarks: p.flaggingRemarks || ''
 })
 
-// Helper: apply a date range filter.
 const applyDateRange = (query, field, from, to, isISO = false) => {
   if (from) {
     const [year, month, day] = from.split('-').map(Number)
@@ -84,14 +79,6 @@ const applyDateRange = (query, field, from, to, isISO = false) => {
   }
   return query
 }
-
-// Helper: apply a simple string equality filter (skips if value is empty)
-const applyStringFilter = (query, field, value) => {
-  if (!value || value === '') return query
-  return query.where(field).equals(value)
-}
-
-// ─── Shared populate config ────────────────────────────────────────────────────
 
 const FULL_POPULATE = [
   {
@@ -141,18 +128,12 @@ const createDeployment = async (req, res, next) => {
       return next(createError(403, 'Access denied'))
     }
 
-    const company =
-      req.user.role === 'head_admin' ? req.body.company : req.user.company
-
-    // truckId and driverId are intentionally NOT required here —
-    // a deployment can be created without a truck/driver and assigned later.
     validateFields({
       truckType,
       helperCount,
       destination,
       receivingContactPerson,
-      receivingContactPersonNo,
-      company
+      receivingContactPersonNo
     })
 
     if (!pickups || !Array.isArray(pickups) || pickups.length === 0) {
@@ -184,7 +165,6 @@ const createDeployment = async (req, res, next) => {
       return next(createError(400, timelineErrors.join(', ')))
     }
 
-    // Only look up truck/driver if they were provided
     let truck = null
     let driver = null
 
@@ -214,11 +194,9 @@ const createDeployment = async (req, res, next) => {
       destDeparture: destDeparture || '',
       isTMOPrinted,
       isSoftDeleted: false,
-      replacements: [],
-      company
+      replacements: []
     })
 
-    // Only update truck/driver status if they were assigned
     const statusUpdates = []
     if (truck)
       statusUpdates.push(
@@ -282,13 +260,11 @@ const getAllDeployments = async (req, res, next) => {
       subcon,
       territory,
       hybrid,
-      flagging,
-      company
+      flagging
     } = req.query
 
     if (completedAtFrom || completedAtTo) status = 'completed'
 
-    // Finance users can only see completed deployments
     if (req.user.role === 'finance') {
       status = 'completed'
     }
@@ -301,15 +277,6 @@ const getAllDeployments = async (req, res, next) => {
         : null
 
     let baseQuery = Deployment.find()
-
-    // ── Company isolation ──
-    if (['admin', 'visitor', 'finance'].includes(req.user.role)) {
-      baseQuery = baseQuery.where('company').equals(req.user.company)
-    }
-
-    if (req.user.role === 'head_admin' && company && company !== '') {
-      baseQuery = baseQuery.where('company').equals(company)
-    }
 
     if (includeDeleted !== 'true')
       baseQuery = baseQuery.where('isSoftDeleted').ne(true)
@@ -422,14 +389,6 @@ const getAllDeployments = async (req, res, next) => {
 
     const buildCountQuery = () => {
       let q = Deployment.find()
-
-      // ── Company isolation for count query ──
-      if (['admin', 'visitor', 'finance'].includes(req.user.role)) {
-        q = q.where('company').equals(req.user.company)
-      }
-      if (req.user.role === 'head_admin' && company && company !== '') {
-        q = q.where('company').equals(company)
-      }
 
       if (includeDeleted !== 'true') q = q.where('isSoftDeleted').ne(true)
       if (status && status !== '') q = q.where('status').equals(status)
@@ -557,7 +516,7 @@ const updateDeployment = async (req, res, next) => {
       cancellationReason,
       isTMOPrinted,
       isPaySlipPrinted,
-      isPaid // ← new field
+      isPaid
     } = req.body
 
     if (!['head_admin', 'admin', 'finance'].includes(req.user.role)) {
@@ -584,19 +543,6 @@ const updateDeployment = async (req, res, next) => {
     if (!existingDeployment)
       return next(createError(404, 'Deployment not found'))
 
-    // ── Company isolation: admins can only update deployments in their company ──
-    if (
-      req.user.role === 'admin' &&
-      existingDeployment.company !== req.user.company
-    ) {
-      return next(
-        createError(
-          403,
-          'Access denied: deployment belongs to a different company'
-        )
-      )
-    }
-
     if (departed !== undefined && departed !== null && departed.trim() !== '') {
       const currentIsTMOPrinted =
         isTMOPrinted !== undefined
@@ -616,7 +562,6 @@ const updateDeployment = async (req, res, next) => {
     const extractedTruckId = truckId?._id || truckId
     const extractedDriverId = driverId?._id || driverId
 
-    // ── Snapshot active replacements BEFORE any modifications ────────────
     const lastTruckReplacement = existingDeployment.replacements
       ?.slice()
       .reverse()
@@ -648,7 +593,7 @@ const updateDeployment = async (req, res, next) => {
       cancellationReason: existingDeployment.cancellationReason,
       isTMOPrinted: existingDeployment.isTMOPrinted,
       isPaySlipPrinted: existingDeployment.isPaySlipPrinted,
-      isPaid: existingDeployment.isPaid, // ← new
+      isPaid: existingDeployment.isPaid,
       replacementTruckId:
         lastTruckReplacement?.replacementTruckId?.toString() ?? '',
       replacementDriverId:
@@ -675,7 +620,6 @@ const updateDeployment = async (req, res, next) => {
       })
     }
 
-    // ── Truck + Driver replacement (combined into one entry) ──────────────────────
     if (replacement?.replacementTruckId || replacement?.replacementDriverId) {
       const replacementTruckId =
         replacement.replacementTruckId?._id || replacement.replacementTruckId
@@ -694,7 +638,6 @@ const updateDeployment = async (req, res, next) => {
           (lastDriverReplacement.replacementDriverId?.toString() ?? '') !==
             replacementDriverId.toString())
 
-      // ── Truck side ────────────────────────────────────────────────────────
       if (isNewTruckReplacement) {
         performedReplacement = true
 
@@ -750,7 +693,6 @@ const updateDeployment = async (req, res, next) => {
         )
       }
 
-      // ── Driver side ───────────────────────────────────────────────────────
       if (isNewDriverReplacement) {
         performedDriverReplacement = true
 
@@ -807,12 +749,10 @@ const updateDeployment = async (req, res, next) => {
         )
       }
 
-      // ── Single combined push ──────────────────────────────────────────────
       if (isNewTruckReplacement || isNewDriverReplacement) {
         const lastIndex = existingDeployment.replacements.length - 1
 
         if (lastIndex >= 0 && !replacement.isNewReplacement) {
-          // Edit latest in-place (from DeploymentDetailsModal)
           if (isNewTruckReplacement) {
             existingDeployment.replacements[lastIndex].replacementTruckId =
               replacementTruckId
@@ -824,7 +764,6 @@ const updateDeployment = async (req, res, next) => {
               replacementDriverId
           }
         } else {
-          // Push new entry (from ReplacementModal or first ever replacement)
           const newEntry = {
             replacedAt: (
               replacement.replacedAt || new Date().toISOString()
@@ -847,7 +786,6 @@ const updateDeployment = async (req, res, next) => {
       }
     }
 
-    // ── Regular truck/driver change (non-replacement) ─────────────────────
     if (
       extractedTruckId != null &&
       extractedTruckId.toString() !== (originalValues.truckId ?? '') &&
@@ -889,7 +827,6 @@ const updateDeployment = async (req, res, next) => {
       }
     }
 
-    // ── Determine final status ────────────────────────────────────────────
     const isDepartedSet =
       departed !== undefined && departed !== '' && departed !== null
     const isDestDepartureSet =
@@ -903,7 +840,6 @@ const updateDeployment = async (req, res, next) => {
     else if (isDestDepartureSet && finalStatus !== 'canceled')
       finalStatus = 'completed'
 
-    // ── Cancellation reason ───────────────────────────────────────────────
     let finalCancellationReason = existingDeployment.cancellationReason
     if (originalStatus === 'canceled' && finalStatus !== 'canceled')
       finalCancellationReason = undefined
@@ -917,7 +853,6 @@ const updateDeployment = async (req, res, next) => {
       finalCancellationReason = cancellationReason
     }
 
-    // ── Active IDs after replacement processing ───────────────────────────
     const updatedLastTruckReplacement = existingDeployment.replacements
       ?.slice()
       .reverse()
@@ -938,7 +873,6 @@ const updateDeployment = async (req, res, next) => {
       existingDeployment.driverId ||
       (extractedDriverId ? extractedDriverId : null)
 
-    // ── Status-based truck/driver availability ────────────────────────────
     const statusUpdates = []
     if (
       finalStatus === 'canceled' ||
@@ -982,7 +916,6 @@ const updateDeployment = async (req, res, next) => {
     }
     await Promise.all(statusUpdates)
 
-    // ── Truck/driver swap (non-replacement) ───────────────────────────────
     if (
       extractedTruckId &&
       extractedTruckId.toString() !== (originalValues.truckId ?? '') &&
@@ -1025,7 +958,6 @@ const updateDeployment = async (req, res, next) => {
       await Promise.all(updates)
     }
 
-    // ── Trip count on completion ──────────────────────────────────────────
     if (finalStatus === 'completed' && originalStatus !== 'completed') {
       try {
         await Promise.all(
@@ -1045,7 +977,6 @@ const updateDeployment = async (req, res, next) => {
       }
     }
 
-    // ── Pickups ───────────────────────────────────────────────────────────
     if (pickups !== undefined) {
       existingDeployment.pickups = pickups.map(mapPickup)
     }
@@ -1139,13 +1070,11 @@ const updateDeployment = async (req, res, next) => {
         isPaySlipPrinted !== undefined
           ? isPaySlipPrinted
           : existingDeployment.isPaySlipPrinted,
-      // ← new field assignment
       isPaid: isPaid !== undefined ? isPaid : existingDeployment.isPaid
     })
 
     await existingDeployment.save()
 
-    // ── Timeline & activity logs ──────────────────────────────────────────
     const timelineLogs = []
     const activityLogs = []
     const now = DateTime.now().setZone(MANILA_TZ).toISO()
@@ -1196,7 +1125,6 @@ const updateDeployment = async (req, res, next) => {
       activityLogs.push(action)
     }
 
-    // ── Pickup timeline logs ──────────────────────────────────────────────
     if (pickups !== undefined && finalStatus !== 'canceled') {
       const isMultiStop = pickups.length >= 2
 
@@ -1366,7 +1294,6 @@ const updateDeployment = async (req, res, next) => {
       }
     }
 
-    // ── Cancellation / resume logs ────────────────────────────────────────
     if (finalStatus === 'canceled' && originalStatus !== 'canceled') {
       await TimelineLog.create({
         performedBy: req.user._id,
@@ -1585,7 +1512,6 @@ const updateDeployment = async (req, res, next) => {
       )
     }
 
-    // ── isPaid activity log ──────────────────────────────────────────────
     if (isPaid !== undefined && isPaid !== originalValues.isPaid) {
       await createActivityLog(
         `Payment status set to ${isPaid ? 'Paid' : 'Unpaid'}`
@@ -1636,17 +1562,6 @@ const softDeleteDeployment = async (req, res, next) => {
     })
     if (!deployment) return next(createError(404, 'Deployment not found'))
 
-    // ── Company isolation: admins can only delete deployments in their company ──
-    if (req.user.role === 'admin' && deployment.company !== req.user.company) {
-      return next(
-        createError(
-          403,
-          'Access denied: deployment belongs to a different company'
-        )
-      )
-    }
-
-    // Walk replacements array backwards to find the active truck and driver
     const lastTruckReplacement = deployment.replacements
       ?.slice()
       .reverse()
@@ -1662,7 +1577,6 @@ const softDeleteDeployment = async (req, res, next) => {
     const activeDriverId =
       lastDriverReplacement?.replacementDriverId || deployment.driverId
 
-    // Only update status if truck/driver are actually assigned
     await Promise.all(
       [
         activeTruckId &&

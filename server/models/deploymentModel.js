@@ -10,13 +10,6 @@ const deploymentSchema = new mongoose.Schema(
       index: true,
       maxlength: [20, 'Deployment code cannot exceed 20 characters']
     },
-    company: {
-      type: String,
-      required: [true, 'Company is required'],
-      trim: true,
-      lowercase: true,
-      maxlength: [100, 'Company name cannot exceed 100 characters']
-    },
 
     // ------------- pickup details ------------- //
     pickups: [

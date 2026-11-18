@@ -50,9 +50,7 @@ import {
 import PaySlipModal from '../../components/modals/PaySlipModal'
 import PageHeader from '../../components/PageHeader'
 import FilterDropdown from '../../components/ui/FilterDropdown'
-import { COMPANY_OPTIONS } from '../../utils/userOptions'
 import { GiCorn, GiStack } from 'react-icons/gi'
-import CreateFGDeployment from '../../components/modals/CreateFGDeployment'
 import { RiCheckLine, RiCloseLine } from 'react-icons/ri'
 import ActionButton from '../../components/ui/ActionButton'
 
@@ -63,7 +61,6 @@ const defaultFilters = {
   territory: '',
   hybrid: '',
   flagging: '',
-  company: '',
   assignedAtFrom: '',
   assignedAtTo: '',
   departedAtFrom: '',
@@ -335,10 +332,7 @@ const SelectFilter = ({ label, name, value, onChange, colSpan, children }) => (
 )
 
 /* ── Truck Details Cell ───────────────────────────────────────────────────── */
-// Safely renders truck plate + type + driver name.
-// Falls back to "—" placeholders when truck or driver is not yet assigned.
 const TruckDetailsCell = ({ deployment }) => {
-  // Determine the active (possibly replacement) truck and driver
   const activeReplacement = deployment.replacements
     ?.slice()
     .reverse()
@@ -395,8 +389,6 @@ function Deployments () {
   const [isDeploymentDetailsModalOpen, setIsDeploymentDetailsModalOpen] =
     useState(false)
   const [isCreateDeploymentModalOpen, setIsCreateDeploymentModalOpen] =
-    useState(false)
-  const [isCreateFGDeploymentModalOpen, setIsCreateFGDeploymentModalOpen] =
     useState(false)
   const [isReplacementModalOpen, setIsReplacementModalOpen] = useState(false)
   const [showReplacementHistory, setShowReplacementHistory] = useState(false)
@@ -803,23 +795,6 @@ function Deployments () {
                   </>
                 )}
 
-                {userData.data.role === 'head_admin' && (
-                  <SelectFilter
-                    label='Company'
-                    name='company'
-                    value={tempFilters.company}
-                    onChange={handleChangeFilter}
-                    colSpan={2}
-                  >
-                    <option value=''>All</option>
-                    {COMPANY_OPTIONS.map((item, index) => (
-                      <option key={index} value={item}>
-                        {item}
-                      </option>
-                    ))}
-                  </SelectFilter>
-                )}
-
                 <DateRangeFilter
                   label='Assigned At'
                   fromName='assignedAtFrom'
@@ -889,62 +864,19 @@ function Deployments () {
                 </div>
               )}
 
-              {/* xl Create */}
+              {/* xl Create — direct button (opens CreateDeploymentModal) */}
               {['head_admin', 'admin'].includes(userData.data.role) && (
-                <div className='dropdown dropdown-end sm:dropdown-center max-xl:hidden'>
-                  <div
-                    tabIndex={0}
-                    role='button'
-                    className={clsx(
-                      btnBase,
-                      'bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-100'
-                    )}
-                  >
-                    <FaPlus className='text-xs' />
-                    <span>Deploy</span>
-                  </div>
-                  <div
-                    tabIndex={0}
-                    className='dropdown-content mt-2 bg-white shadow-lg shadow-gray-200/60 rounded-2xl border border-gray-100 w-[calc(100vw-2rem)] max-w-xs overflow-hidden'
-                  >
-                    <div className='p-1.5 space-y-0.5'>
-                      <button
-                        onClick={() => setIsCreateFGDeploymentModalOpen(true)}
-                        className='w-full text-left px-3 py-2.5 hover:bg-gray-50 rounded-md flex items-center gap-3 cursor-pointer active:scale-[0.98] transition-all group'
-                      >
-                        <div className='w-8 h-8 rounded-md bg-emerald-50 flex items-center justify-center shrink-0 group-hover:bg-emerald-100 transition-colors'>
-                          <FaArchive className='text-sm text-emerald-500' />
-                        </div>
-                        <div>
-                          <p className='text-xs font-medium text-gray-700'>
-                            Finished Goods
-                          </p>
-                          <p className='text-xxs text-gray-400 mt-0.5'>
-                            Processed goods transport
-                          </p>
-                        </div>
-                      </button>
-
-                      <button
-                        onClick={() => setIsCreateDeploymentModalOpen(true)}
-                        className='w-full text-left px-3 py-2.5 hover:bg-gray-50 rounded-md flex items-center gap-3 cursor-pointer active:scale-[0.98] transition-all group'
-                      >
-                        <div className='w-8 h-8 rounded-md bg-amber-50 flex items-center justify-center shrink-0 group-hover:bg-amber-100 transition-colors'>
-                          <FaSeedling className='text-sm text-amber-500' />
-                        </div>
-                        <div>
-                          <p className='text-xs font-medium text-gray-700'>
-                            Field Harvest
-                          </p>
-                          <p className='text-xxs text-gray-400 mt-0.5'>
-                            From field to plant transports
-                          </p>
-                        </div>
-                      </button>
-                    </div>
-                    <div className='pb-1.5' />
-                  </div>
-                </div>
+                <button
+                  onClick={() => setIsCreateDeploymentModalOpen(true)}
+                  disabled={isDeploymentLoading}
+                  className={clsx(
+                    btnBase,
+                    'max-xl:hidden bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-100'
+                  )}
+                >
+                  <FaPlus className='text-xs' />
+                  <span>Deploy</span>
+                </button>
               )}
             </div>
           </div>
@@ -1205,13 +1137,6 @@ function Deployments () {
         updatable={['head_admin', 'admin', 'finance'].includes(
           userData.data.role
         )}
-      />
-      <CreateFGDeployment
-        isOpen={isCreateFGDeploymentModalOpen}
-        onClose={() => setIsCreateFGDeploymentModalOpen(false)}
-        trucks={allTrucks}
-        drivers={allDrivers}
-        onCreate={handleAddNewDeployment}
       />
       <CreateDeploymentModal
         isOpen={isCreateDeploymentModalOpen}

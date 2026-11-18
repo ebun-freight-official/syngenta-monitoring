@@ -1373,7 +1373,7 @@ const LightInputField = ({ label, type, name, value, onChange, disabled }) => {
           onChange={onChange}
           disabled={disabled}
           className={clsx(
-            'text-xs max-sm:text-xxs px-3 py-[7px] rounded-md border focus:outline-none transition-colors w-full',
+            'text-xs max-sm:text-xxs px-3 py-1.75 rounded-md border focus:outline-none transition-colors w-full',
             'appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-inner-spin-button]:hidden [&::-webkit-clear-button]:hidden',
             disabled
               ? 'bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed'

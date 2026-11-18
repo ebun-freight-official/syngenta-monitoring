@@ -85,9 +85,7 @@ export const exportSubconBillingToExcel = async (allDeployments, userData) => {
     .toFormat('MMMM dd, yyyy')
 
   const firstDeployment = allDeployments[0]
-  const companyName = (
-    firstDeployment?.truckId?.subcon || 'NO SUBCON COMPANY INDICATED'
-  )
+  const companyName = 'NO SUBCON COMPANY INDICATED'
     .replace(/_/g, ' ')
     .toUpperCase()
 

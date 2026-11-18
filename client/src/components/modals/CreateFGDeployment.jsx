@@ -16,7 +16,6 @@ import ActionButton from '../ui/ActionButton'
 import InputField from '../ui/InputField'
 import SelectField from '../ui/SelectField'
 import ComboboxField from '../ui/ComboboxField'
-import { COMPANY_OPTIONS } from '../../utils/userOptions'
 import { useUserContext } from '../../contexts/UserContext'
 
 const defaultPickup = {
@@ -40,8 +39,7 @@ const defaultValue = {
   totalWeightKg: 0,
   departed: '',
   destArrival: '',
-  destDeparture: '',
-  company: 'advanta'
+  destDeparture: ''
 }
 
 const MAX_PICKUPS = 10

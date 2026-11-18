@@ -121,15 +121,6 @@ const processAndUploadImage = async (file, folderPath) => {
 const normaliseEmail = email =>
   typeof email === 'string' ? email.trim().toLowerCase() : email
 
-/**
- * Normalise a company name: trim whitespace and lower-case.
- * Returns null if falsy so the schema default is respected.
- */
-const normaliseCompany = company =>
-  typeof company === 'string' && company.trim()
-    ? company.trim().toLowerCase()
-    : null
-
 // ─── Controllers ──────────────────────────────────────────────────────────────
 
 // ── Create Admin ──────────────────────────────────────────────────────────────
@@ -145,8 +136,7 @@ const createUser = async (req, res, next) => {
       confirmPassword,
       role,
       status,
-      subcon,
-      company
+      subcon
     } = req.body
 
     if (!['head_admin'].includes(req.user.role)) {
@@ -161,8 +151,7 @@ const createUser = async (req, res, next) => {
           { name: 'middlename', value: middlename },
           { name: 'lastname', value: lastname },
           { name: 'email', value: email },
-          { name: 'phoneNo', value: phoneNo },
-          { name: 'company', value: company }
+          { name: 'phoneNo', value: phoneNo }
         ],
         next
       )
@@ -222,7 +211,6 @@ const createUser = async (req, res, next) => {
       role,
       status,
       subcon,
-      company: normaliseCompany(company),
       imageUrl: imageData.url,
       imagePublicId: imageData.publicId
     })
@@ -319,7 +307,6 @@ const loginUser = async (req, res, next) => {
         phone: updatedUser.phoneNo,
         role: updatedUser.role,
         status: updatedUser.status,
-        company: updatedUser.company,
         loginCount: updatedUser.loginCount,
         lastLogin: updatedUser.lastLogin,
         imageUrl: updatedUser.imageUrl,
@@ -406,8 +393,7 @@ const getAllUsers = async (req, res, next) => {
         { middlename: regex },
         { lastname: regex },
         { email: regex },
-        { phoneNo: regex },
-        { company: regex }
+        { phoneNo: regex }
       ]
 
       if (query.$or) {
@@ -462,7 +448,6 @@ const updateUser = async (req, res, next) => {
       role,
       status,
       subcon,
-      company,
       password,
       confirmPassword
     } = req.body
@@ -536,8 +521,7 @@ const updateUser = async (req, res, next) => {
           { name: 'middlename', value: middlename },
           { name: 'lastname', value: lastname },
           { name: 'email', value: email },
-          { name: 'phoneNo', value: phoneNo },
-          { name: 'company', value: company }
+          { name: 'phoneNo', value: phoneNo }
         ],
         next
       )
@@ -627,15 +611,6 @@ const updateUser = async (req, res, next) => {
       changedDetails.push(
         `subcon: "${existingUser.subcon || 'none'}" → "${subcon}"`
       )
-    if (
-      company !== undefined &&
-      normaliseCompany(company) !== existingUser.company
-    )
-      changedDetails.push(
-        `company: "${existingUser.company || 'none'}" → "${
-          normaliseCompany(company) || 'none'
-        }"`
-      )
     if (req.file) changedDetails.push('profile picture updated')
     if (password !== undefined) changedDetails.push('password changed')
 
@@ -666,10 +641,6 @@ const updateUser = async (req, res, next) => {
       role: role !== undefined ? role : existingUser.role,
       status: status !== undefined ? status : existingUser.status,
       subcon: subcon !== undefined ? subcon : existingUser.subcon,
-      company:
-        company !== undefined
-          ? normaliseCompany(company)
-          : existingUser.company,
       imageUrl,
       imagePublicId
     }

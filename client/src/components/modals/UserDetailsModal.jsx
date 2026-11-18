@@ -17,7 +17,7 @@ import { no_image } from '../../consts/images'
 import clsx from 'clsx'
 import { DateTime } from 'luxon'
 import { MdKeyboardArrowDown } from 'react-icons/md'
-import { COMPANY_OPTIONS, USER_STATUS_TYPES } from '../../utils/userOptions'
+import { USER_STATUS_TYPES } from '../../utils/userOptions'
 import { toast } from 'react-toastify'
 import { RiFolderUploadLine } from 'react-icons/ri'
 import { useSettingsContext } from '../../contexts/SettingsContext'
@@ -199,7 +199,6 @@ function UserDetailsModal ({
                     'linear-gradient(155deg, #020617 0%, #001e36 55%, #0f172a 100%)'
                 }}
               >
-                {/* Radial glows */}
                 <div
                   className='absolute -top-16 -right-16 w-56 h-56 rounded-full opacity-10 pointer-events-none'
                   style={{
@@ -217,7 +216,6 @@ function UserDetailsModal ({
 
                 <DotPattern />
 
-                {/* Container: row on mobile, column on desktop */}
                 <div className='relative z-10 w-full flex flex-row md:flex-col md:items-center gap-4'>
                   {/* Avatar */}
                   <div
@@ -274,7 +272,6 @@ function UserDetailsModal ({
 
                   {/* Meta info */}
                   <div className='flex-1 w-full grid grid-cols-2 items-end place-content-stretch md:gap-y-3 md:gap-x-2'>
-                    {/* Last Login */}
                     <div className='flex flex-col items-start'>
                       <span className='text-white/50 text-xxxs max-md:text-[0.4rem] uppercase tracking-wider font-semibold mb-0.5'>
                         Last Login
@@ -288,7 +285,6 @@ function UserDetailsModal ({
                       </span>
                     </div>
 
-                    {/* Login Count */}
                     <div className='flex flex-col items-end'>
                       <span className='text-white/50 text-xxxs max-md:text-[0.4rem] uppercase tracking-wider font-semibold mb-0.5'>
                         Logins
@@ -298,7 +294,6 @@ function UserDetailsModal ({
                       </span>
                     </div>
 
-                    {/* Approved / Created */}
                     <div className='flex flex-col items-start'>
                       <span className='text-white/50 text-xxxs max-md:text-[0.4rem] uppercase tracking-wider font-semibold mb-0.5'>
                         {user?.role === 'admin' || user?.role === 'head_admin'
@@ -314,7 +309,6 @@ function UserDetailsModal ({
                       </span>
                     </div>
 
-                    {/* Updated At */}
                     <div className='flex flex-col items-end'>
                       <span className='text-white/50 text-xxxs max-md:text-[0.4rem] uppercase tracking-wider font-semibold mb-0.5'>
                         Updated
@@ -397,23 +391,6 @@ function UserDetailsModal ({
                           onChange={handleChange}
                           isCapitalize={false}
                         />
-
-                        <SelectField
-                          label='Company'
-                          name='company'
-                          value={editForm?.company || ''}
-                          onChange={handleChange}
-                          disabled={!isEditMode || isLoading}
-                        >
-                          <option value='' disabled>
-                            Select company
-                          </option>
-                          {COMPANY_OPTIONS.map((item, i) => (
-                            <option key={i} value={item.toLowerCase()}>
-                              {item}
-                            </option>
-                          ))}
-                        </SelectField>
 
                         <InputField
                           label='Role'
@@ -573,7 +550,7 @@ function UserDetailsModal ({
                           onChange={handleChange}
                         />
 
-                        <div className='col-span-full grid grid-cols-3 gap-x-4 gap-y-4 max-md:gap-x-3 max-md:gap-y-3'>
+                        <div className='col-span-full grid grid-cols-2 gap-x-4 gap-y-4 max-md:gap-x-3 max-md:gap-y-3'>
                           <SelectField
                             label='Role'
                             name='role'
@@ -600,23 +577,6 @@ function UserDetailsModal ({
                             {USER_STATUS_TYPES.map((s, i) => (
                               <option key={i} value={s.value}>
                                 {s.label}
-                              </option>
-                            ))}
-                          </SelectField>
-
-                          <SelectField
-                            label='Company'
-                            name='company'
-                            value={editForm?.company || ''}
-                            onChange={handleChange}
-                            disabled={!isEditMode || isLoading}
-                          >
-                            <option value='' disabled>
-                              Select company
-                            </option>
-                            {COMPANY_OPTIONS.map((item, i) => (
-                              <option key={i} value={item.toLowerCase()}>
-                                {item}
                               </option>
                             ))}
                           </SelectField>
