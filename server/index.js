@@ -22,7 +22,7 @@ connectDB()
 const app = express()
 
 const corsOptions = {
-  origin: ['syngenta-monitoring.vercel.app', 'http://localhost:5173'],
+  origin: ['https://syngenta-monitoring.vercel.app', 'http://localhost:5173'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
